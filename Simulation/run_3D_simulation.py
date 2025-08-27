@@ -42,8 +42,8 @@ def main():
     # Simulation Setup
     # --------------------------- 
     Ti = 0
-    Ts = 0.005
-    Tf = 20
+    Ts = 0.002
+    Tf = 15
     ifsave = 0
 
     # Choose trajectory settings
@@ -147,6 +147,7 @@ def main():
     utils.makeFigures(quad.params, t_all, pos_all, vel_all, quat_all, omega_all, euler_all, w_cmd_all, wMotor_all, thr_all, tor_all, sDes_traj_all, sDes_calc_all)
     ani = utils.sameAxisAnimation(t_all, traj.wps, pos_all, quat_all, sDes_traj_all, Ts, quad.params, traj.xyzType, traj.yawType, ifsave)
     plt.show()
+    pass
 
 if __name__ == "__main__":
     if (config.orient == "NED" or config.orient == "ENU"):
