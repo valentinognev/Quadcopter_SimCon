@@ -18,6 +18,7 @@ from numpy import sin, cos, tan, sqrt
 from numpy.linalg import norm
 import utils
 import config
+from SF_Enjoy import SF_Enjoy_main
 
 rad2deg = 180.0/pi
 deg2rad = pi/180.0
@@ -33,7 +34,7 @@ Pz    = 1.0
 pos_P_gain = np.array([Px, Py, Pz])
 
 # Velocity P-D gains
-Pxdot = 5.0*2*2
+Pxdot = 5.0  #*4  #*2*2
 Dxdot = 0.5
 Ixdot = 5.0
 
@@ -41,7 +42,7 @@ Pydot = Pxdot
 Dydot = Dxdot
 Iydot = Ixdot
 
-Pzdot = 4.0*6*6
+Pzdot = 4.0*10   #*6*6
 Dzdot = 0.5
 Izdot = 5.0
 
@@ -58,14 +59,14 @@ PpsiStrong = 8
 att_P_gain = np.array([Pphi, Ptheta, Ppsi])
 
 # Rate P-D gains
-Pp = 1.5*0.25
-Dp = 0.04*0.25
+Pp = 1.5   #*0.25
+Dp = 0.04   #*0.25
 
 Pq = Pp
 Dq = Dp 
 
-Pr = 1.0*0.25
-Dr = 0.1*0.25
+Pr = 1.0   #*0.25
+Dr = 0.1   #*0.25
 
 rate_P_gain = np.array([Pp, Pq, Pr])
 rate_D_gain = np.array([Dp, Dq, Dr])
@@ -107,7 +108,7 @@ class Control:
         self.eul_sp    = np.zeros(3)
         self.pqr_sp    = np.zeros(3)
         self.yawFF     = np.zeros(3)
-
+        self.policy = SF_Enjoy_main().enjoy()
     
     def controller(self, traj, quad, sDes, Ts):
 

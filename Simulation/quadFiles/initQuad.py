@@ -14,8 +14,8 @@ import config
 
 
 def sys_params():
-    massScale = 0.45
-    geomScale = 0.45
+    massScale = 1.5/1.2   #0.45
+    geomScale = 0.22/0.16 #0.45
     mB  = 1.2*massScale       # mass (kg)
     g   = 9.81      # gravity (m/s/s)
     dxm = 0.16*geomScale      # arm length (m)
