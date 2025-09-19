@@ -112,7 +112,7 @@ def init_state(params):
     z0     = 0.  # m
     phi0   = 0.  # rad
     theta0 = 0.  # rad
-    psi0   = 0.  # rad
+    psi0   = 0.  #-90./180.*pi  # rad
 
     quat = utils.YPRToQuat(psi0, theta0, phi0)
     

@@ -143,7 +143,7 @@ def point_trajectory_override_defaults(env, parser: argparse.ArgumentParser):
     )
 
 def parse_args(argv=None, evaluation=False):
-    argv = ['--env=point_trajectory', '--experiment=Test', '--train_dir=./train_dir', '--load_checkpoint_kind', 'best', '--eval_deterministic=True', '--video_frames=300', '--device=cpu']
+    argv = ['--env=point_trajectory', '--experiment=Tan05', '--train_dir=./train_dir', '--load_checkpoint_kind', 'best', '--eval_deterministic=True', '--video_frames=300', '--device=cpu']
     parser, partial_cfg = parse_sf_args(argv=argv, evaluation=evaluation)
     add_point_env_args(partial_cfg.env, parser, evaluation=evaluation)
     point_trajectory_override_defaults(partial_cfg.env, parser)
@@ -157,7 +157,8 @@ def SF_Enjoy_main():
     cfg = parse_args(evaluation=True)
     # satisfy SF enjoy argument requirements
     cfg.cli_args = vars(cfg)
-    return SF_Enjoy(cfg)
+    hxs = torch.zeros(1, 1, 512)[0]
+    return SF_Enjoy(cfg), hxs
 
 
 class SF_Enjoy:

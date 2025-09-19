@@ -81,7 +81,7 @@ class PointTrajectoryEnv(gym.Env, TrainingInfoInterface):
         self.max_steps = getattr(env_config, 'max_steps', 1000)  # 1000 steps * dt(=0.01s) = 10s
 
         # Action & observation spaces
-        self.max_speed = 1.0
+        self.max_speed = 5.0
         self.max_w = np.deg2rad(30)
         self.action_space = spaces.Box(
             low=np.array([-self.max_speed, -self.max_speed, -self.max_w ], dtype=np.float32),   # v_forward, v_right, w
@@ -92,13 +92,13 @@ class PointTrajectoryEnv(gym.Env, TrainingInfoInterface):
                              -np.pi,              # theta
                              -self.max_speed,     # r_dot
                              -np.pi,              # theta_dot
-                             -self.max_speed,     # v_forward
-                             -self.max_speed,     # v_right
-                             -self.max_speed,     # V_forward average
-                             -self.max_speed],    # V_right average
+                             ],    # V_right average
                             dtype=np.float32)
-        obs_high = np.array([20.0,  np.pi, self.max_speed, np.pi, 
-                             self.max_speed, self.max_speed, self.max_speed, self.max_speed], dtype=np.float32)
+        obs_high = np.array([20.0,  
+                             np.pi, 
+                             self.max_speed, 
+                             np.pi, 
+                             ], dtype=np.float32)
         self.observation_space = spaces.Box(low=obs_low, high=obs_high, dtype=np.float32)
 
         # Internal state
@@ -233,7 +233,7 @@ class PointTrajectoryEnv(gym.Env, TrainingInfoInterface):
         self.theta = theta ## DEBUG
         self.last_r = r
         self.last_theta = theta
-        obs = np.array([r, theta,0.0, 0.0, 0.0, 0.0, 0.0, 0.0], dtype=np.float32)
+        obs = np.array([r, theta,0.0, 0.0], dtype=np.float32)
         self.step_count = 0
         if self.render_mode == 'human':
             self._init_render()
@@ -298,8 +298,7 @@ class PointTrajectoryEnv(gym.Env, TrainingInfoInterface):
         self.vf_avg = np.sum(self.vf_history)/self.history_length
         self.vr_avg = np.sum(self.vr_history)/self.history_length
         self.hist_i = (self.hist_i + 1) % self.history_length
-        obs = np.array([r, theta, r_dot, theta_dot, 
-                        self.vf, self.vr, self.vf_avg, self.vr_avg], dtype=np.float32)
+        obs = np.array([r, theta, r_dot, theta_dot,], dtype=np.float32)
 
         # Reward
         dist_part = -self.r_reward*(r**2)

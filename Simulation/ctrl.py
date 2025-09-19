@@ -19,6 +19,7 @@ from numpy.linalg import norm
 import utils
 import config
 from SF_Enjoy import SF_Enjoy_main
+from copy import deepcopy
 
 rad2deg = 180.0/pi
 deg2rad = pi/180.0
@@ -66,7 +67,7 @@ Pq = Pp
 Dq = Dp 
 
 Pr = 1.0   #*0.25
-Dr = 0.1   #*0.25
+Dr = 0.13   #*0.25
 
 rate_P_gain = np.array([Pp, Pq, Pr])
 rate_D_gain = np.array([Dp, Dq, Dr])
@@ -108,22 +109,49 @@ class Control:
         self.eul_sp    = np.zeros(3)
         self.pqr_sp    = np.zeros(3)
         self.yawFF     = np.zeros(3)
-        self.policy = SF_Enjoy_main().enjoy()
+        sf_enjoy, self.hxs = SF_Enjoy_main()
+        self.policy = sf_enjoy.enjoy
+        
+        # RL control
+        self.history_length = 3
+        self.last_r = 0.0
+        self.last_theta = 0.0
+        self.vf_history = np.zeros(self.history_length)
+        self.vr_history = np.zeros(self.history_length)
+        self.vf_avg = 0.0
+        self.vr_avg = 0.0
+        self.vf = 0.0
+        self.vr = 0.0
+        self.hist_i = 0 
+        self.pos_control_dt = 0.1
+        self.current_time = 0.0
+        self.next_pos_control_time = self.current_time
     
     def controller(self, traj, quad, sDes, Ts):
-
         # Desired State (Create a copy, hence the [:])
         # ---------------------------
-        self.pos_sp[:]    = traj.sDes[0:3]
-        self.vel_sp[:]    = traj.sDes[3:6]
-        self.acc_sp[:]    = traj.sDes[6:9]
-        self.thrust_sp[:] = traj.sDes[9:12]
-        self.eul_sp[:]    = traj.sDes[12:15]
-        self.pqr_sp[:]    = traj.sDes[15:18]
-        self.yawFF[:]     = traj.sDes[18]
         
         # Select Controller
         # ---------------------------
+        if (traj.ctrlType == "xyz_pos"):
+            self.pos_sp[:]    = sDes[0:3]
+            self.xy_pos_control(quad, Ts)
+            self.z_pos_control(quad, Ts)
+            self.saturateVel()
+            self.z_vel_control(quad, Ts)
+            self.xy_vel_control(quad, Ts)
+            self.thrustToAttitude(quad, Ts)
+            self.attitude_control(quad, Ts)
+            self.rate_control(quad, Ts)
+        else:
+            self.pos_sp[:]    = sDes[0:3]
+            self.vel_sp[:]    = sDes[3:6]
+            self.acc_sp[:]    = sDes[6:9]
+            self.thrust_sp[:] = sDes[9:12]
+            self.eul_sp[:]    = sDes[12:15]
+            self.pqr_sp[:]    = sDes[15:18]
+            self.yawFF[:]     = sDes[18] 
+               
         if (traj.ctrlType == "xyz_vel"):
             self.saturateVel()
             self.z_vel_control(quad, Ts)
@@ -133,15 +161,6 @@ class Control:
             self.rate_control(quad, Ts)
         elif (traj.ctrlType == "xy_vel_z_pos"):
             self.z_pos_control(quad, Ts)
-            self.saturateVel()
-            self.z_vel_control(quad, Ts)
-            self.xy_vel_control(quad, Ts)
-            self.thrustToAttitude(quad, Ts)
-            self.attitude_control(quad, Ts)
-            self.rate_control(quad, Ts)
-        elif (traj.ctrlType == "xyz_pos"):
-            self.z_pos_control(quad, Ts)
-            self.xy_pos_control(quad, Ts)
             self.saturateVel()
             self.z_vel_control(quad, Ts)
             self.xy_vel_control(quad, Ts)
@@ -160,6 +179,7 @@ class Control:
         self.sDesCalc[6:9] = self.thrust_sp
         self.sDesCalc[9:13] = self.qd
         self.sDesCalc[13:16] = self.rate_sp
+        self.current_time += Ts
 
 
     def z_pos_control(self, quad, Ts):
@@ -168,15 +188,55 @@ class Control:
         # --------------------------- 
         pos_z_error = self.pos_sp[2] - quad.pos[2]
         self.vel_sp[2] += pos_P_gain[2]*pos_z_error
-        
-    
+           
     def xy_pos_control(self, quad, Ts):
-
+        if self.current_time-self.next_pos_control_time < -1e-6:
+            vel_sp = quad.dcm@np.array([self.vf, self.vr, 0])
+            self.vel_sp = vel_sp
+            return
+        self.next_pos_control_time += self.pos_control_dt
         # XY Position Control
         # --------------------------- 
-        pos_xy_error = (self.pos_sp[0:2] - quad.pos[0:2])
-        self.vel_sp[0:2] += pos_P_gain[0:2]*pos_xy_error
-        
+        # pos_xy_error = (self.pos_sp[0:2] - quad.pos[0:2])
+        # self.vel_sp[0:2] += pos_P_gain[0:2]*pos_xy_error
+
+        ########################################################
+        # RL control 
+               # Observation
+        delta = (self.pos_sp[0:2] - quad.pos[0:2])
+        r = np.linalg.norm(delta)
+          
+        delta_body=(quad.dcm.T)@(self.pos_sp - quad.pos)
+        if np.linalg.norm(delta_body) < 1e-6:
+            theta = 0.0
+        else:
+            theta = np.arctan2(delta_body[0], delta_body[1])
+        theta = (theta + np.pi) % (2*np.pi) - np.pi
+
+        if self.current_time == 0:
+            r_dot = 0
+            theta_dot = 0
+        else:
+            r_dot = (r - self.last_r)/self.pos_control_dt
+            theta_dot = (theta - self.last_theta)/self.pos_control_dt
+            
+        self.last_r = r
+        self.last_theta = theta
+            # Save action history and compute running average
+
+        self.vf_history[self.hist_i] = self.vf
+        self.vr_history[self.hist_i] = self.vr
+        self.vf_avg = np.sum(self.vf_history)/self.history_length
+        self.vr_avg = np.sum(self.vr_history)/self.history_length
+        self.hist_i = (self.hist_i + 1) % self.history_length
+        obs = np.array([[r, theta, r_dot, theta_dot]], dtype=np.float32)
+        actions, rnn_states_out, action_mean, action_logstd = self.policy(obs, self.hxs) 
+        self.hxs = deepcopy(rnn_states_out)
+        self.vf, self.vr = np.array(action_mean[0:2])    
+        # self.vel_sp[0:2] = np.array([self.vf, self.vr])
+        self.vel_sp = quad.dcm@np.array([self.vf, self.vr, 0])
+        # self.vel_sp[0:2] = vel_sp[0:2]
+        pass
         
     def saturateVel(self):
 

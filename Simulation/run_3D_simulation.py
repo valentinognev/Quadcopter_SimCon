@@ -20,11 +20,7 @@ import config
 
 def quad_sim(t, Ts, quad, ctrl, wind, traj):
     
-    # Dynamics (using last timestep's commands)
-    # ---------------------------
-    quad.update(t, Ts, ctrl.w_cmd, wind)
-    t += Ts
-
+   
     # Trajectory for Desired States 
     # ---------------------------
     sDes = traj.desiredState(t, Ts, quad)        
@@ -33,6 +29,11 @@ def quad_sim(t, Ts, quad, ctrl, wind, traj):
     # ---------------------------
     ctrl.controller(traj, quad, sDes, Ts)
 
+    # Dynamics (using last timestep's commands)
+    # ---------------------------
+    quad.update(t, Ts, ctrl.w_cmd, wind)
+    t += Ts
+    
     return t
     
 
@@ -42,7 +43,7 @@ def main():
     # Simulation Setup
     # --------------------------- 
     Ti = 0
-    Ts = 0.002
+    Ts = 0.01 #0.002
     Tf = 15
     ifsave = 0
 
@@ -58,11 +59,11 @@ def main():
     #                                  7: minimum accel_stop        8: minimum jerk_stop        9: minimum snap_stop
     #                                 10: minimum jerk_full_stop   11: minimum snap_full_stop
     #                                 12: pos_waypoint_arrived     13: pos_waypoint_arrived_wait
-    trajSelect[0] = 5         
+    trajSelect[0] = 99         
     # Select Yaw Trajectory Type      (0: none                      1: yaw_waypoint_timed,      2: yaw_waypoint_interp     3: follow          4: zero)
-    trajSelect[1] = 3           
+    trajSelect[1] = 0           
     # Select if waypoint time is used, or if average speed is used to calculate waypoint time   (0: waypoint time,   1: average speed)
-    trajSelect[2] = 1           
+    trajSelect[2] = 0           
     print("Control type: {}".format(ctrlType))
 
     # Initialize Quadcopter, Controller, Wind, Result Matrixes
@@ -74,11 +75,11 @@ def main():
 
     # Trajectory for First Desired States
     # ---------------------------
-    sDes = traj.desiredState(0, Ts, quad)        
+    # sDes = traj.desiredState(0, Ts, quad)        
 
     # Generate First Commands
     # ---------------------------
-    ctrl.controller(traj, quad, sDes, Ts)
+    # ctrl.controller(traj, quad, sDes, Ts)
     
     # Initialize Result Matrixes
     # ---------------------------
