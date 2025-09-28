@@ -95,7 +95,7 @@ rateMax = np.array([pMax, qMax, rMax])
 
 class Control:
     
-    def __init__(self, quad, yawType):
+    def __init__(self, quad, yawType, control_dt):
         self.sDesCalc = np.zeros(16)
         self.w_cmd = np.ones(4)*quad.params["w_hover"]
         self.thr_int = np.zeros(3)
@@ -123,10 +123,12 @@ class Control:
         self.vf = 0.0
         self.vr = 0.0
         self.hist_i = 0 
-        self.pos_control_dt = 0.1
+        self.pos_control_dt = control_dt
         self.current_time = 0.0
         self.next_pos_control_time = self.current_time
-    
+        self.action_mean = np.zeros(2)
+        self.obs = np.zeros(4)
+        
     def controller(self, traj, quad, sDes, Ts):
         # Desired State (Create a copy, hence the [:])
         # ---------------------------
@@ -229,10 +231,10 @@ class Control:
         self.vf_avg = np.sum(self.vf_history)/self.history_length
         self.vr_avg = np.sum(self.vr_history)/self.history_length
         self.hist_i = (self.hist_i + 1) % self.history_length
-        obs = np.array([[r, theta, r_dot, theta_dot]], dtype=np.float32)
-        actions, rnn_states_out, action_mean, action_logstd = self.policy(obs, self.hxs) 
+        self.obs = np.array([[r, 0.0, np.sin(theta), np.cos(theta)]], dtype=np.float32)
+        actions, rnn_states_out, self.action_mean, action_logstd = self.policy(self.obs, self.hxs) 
         self.hxs = deepcopy(rnn_states_out)
-        self.vf, self.vr = np.array(action_mean[0:2])    
+        self.vf, self.vr = np.array(self.action_mean[0:2])    
         # self.vel_sp[0:2] = np.array([self.vf, self.vr])
         self.vel_sp = quad.dcm@np.array([self.vf, self.vr, 0])
         # self.vel_sp[0:2] = vel_sp[0:2]

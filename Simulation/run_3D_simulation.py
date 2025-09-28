@@ -20,7 +20,11 @@ import config
 
 def quad_sim(t, Ts, quad, ctrl, wind, traj):
     
-   
+    
+    # Dynamics (using last timestep's commands)
+    # ---------------------------
+    quad.update(t, Ts, ctrl.w_cmd, wind)
+
     # Trajectory for Desired States 
     # ---------------------------
     sDes = traj.desiredState(t, Ts, quad)        
@@ -28,12 +32,8 @@ def quad_sim(t, Ts, quad, ctrl, wind, traj):
     # Generate Commands (for next iteration)
     # ---------------------------
     ctrl.controller(traj, quad, sDes, Ts)
-
-    # Dynamics (using last timestep's commands)
-    # ---------------------------
-    quad.update(t, Ts, ctrl.w_cmd, wind)
     t += Ts
-    
+   # [quad.pos, quad.vel, ctrl.w_cmd, ctrl.action_mean]
     return t
     
 
@@ -44,6 +44,7 @@ def main():
     # --------------------------- 
     Ti = 0
     Ts = 0.01 #0.002
+    control_dt = 0.01
     Tf = 15
     ifsave = 0
 
@@ -70,7 +71,7 @@ def main():
     # ---------------------------
     quad = Quadcopter(Ti)
     traj = Trajectory(quad, ctrlType, trajSelect)
-    ctrl = Control(quad, traj.yawType)
+    ctrl = Control(quad, traj.yawType, control_dt)
     wind = Wind('None', 2.0, 90, -15)
 
     # Trajectory for First Desired States

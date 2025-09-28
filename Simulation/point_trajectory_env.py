@@ -1,4 +1,3 @@
-import sys
 import gymnasium as gym
 from gymnasium import spaces
 import numpy as np
@@ -7,7 +6,7 @@ import matplotlib.pyplot as plt
 from collections import deque
 
 from copy import deepcopy
-
+import sys
 sys.path.append("../sample-factory")
 from sample_factory.envs.env_utils import TrainingInfoInterface
 
@@ -51,12 +50,13 @@ class PointTrajectoryEnv(gym.Env, TrainingInfoInterface):
 
     def __init__(self, full_env_name: str, cfg=None, env_config=None, render_mode=None):
         super().__init__()
-        self.dt = 0.1
+        self.dt = 0.1   # time step for velocity contol
         self.render_mode = render_mode
         self.globalTime = 0.0
-        self.quadTs = 0.001 # time step for quadcopter simulation
+        self.quadTs = 0.01 # time step for quadcopter simulation
 
         # Base parameters
+        self.max_range = 20.0
         self.radius_mean = 10.0
         self.radius_min = 0.0
         self.radius_max = 20.0
@@ -70,12 +70,13 @@ class PointTrajectoryEnv(gym.Env, TrainingInfoInterface):
         
         # Reward shaping
         self.r_reward = 0.4
+        self.epsilon_r = 0.4
         self.theta_reward = 33.0
         self.reward_min = 0.5
         self.reward_max = 2.5
-        self.goal_factor = 10
+        self.goal_factor = 100
         self.goal_radius = 0.2
-        self.AP_factor = 10.0  # start with minimal penalty
+        self.AP_factor = 1.0  # start with minimal penalty
 
         # Episode length 
         self.max_steps = getattr(env_config, 'max_steps', 1000)  # 1000 steps * dt(=0.01s) = 10s
@@ -89,15 +90,15 @@ class PointTrajectoryEnv(gym.Env, TrainingInfoInterface):
             dtype=np.float32                                                                    
         )
         obs_low  = np.array([0.0,                 # r
-                             -np.pi,              # theta
                              -self.max_speed,     # r_dot
-                             -np.pi,              # theta_dot
-                             ],    # V_right average
+                             -1.0,              # sin(theta)
+                             -1.0,              # cos(theta)
+                            ],    # V_right average
                             dtype=np.float32)
         obs_high = np.array([20.0,  
-                             np.pi, 
                              self.max_speed, 
-                             np.pi, 
+                             1.0, 
+                             1.0
                              ], dtype=np.float32)
         self.observation_space = spaces.Box(low=obs_low, high=obs_high, dtype=np.float32)
 
@@ -204,11 +205,6 @@ class PointTrajectoryEnv(gym.Env, TrainingInfoInterface):
         # Reset agent
         self.agent_pos[:] = 0.0
         self.agent_heading = 0.0
-        self.vf_history = np.zeros(self.history_length)
-        self.vr_history = np.zeros(self.history_length)
-        self.vf_avg = 0.0
-        self.vr_avg = 0.0
-        self.hist_i = 0 
 
         self.globalTime +=1
 
@@ -229,11 +225,12 @@ class PointTrajectoryEnv(gym.Env, TrainingInfoInterface):
             self.target_pos = (x,y)
 
         # Initial obs
-        r, theta = 0.0, 0.0
+        r, theta = self._get_obs()
+        self.max_range = r
         self.theta = theta ## DEBUG
         self.last_r = r
         self.last_theta = theta
-        obs = np.array([r, theta,0.0, 0.0], dtype=np.float32)
+        obs = np.array([r, 0.0, sin(theta), cos(theta)], dtype=np.float32)
         self.step_count = 0
         if self.render_mode == 'human':
             self._init_render()
@@ -242,12 +239,16 @@ class PointTrajectoryEnv(gym.Env, TrainingInfoInterface):
 
     def _get_obs(self):
 
+        self.quad.extended_state()        
         delta = self.target_pos - self.quad.pos[:2]
         r = np.linalg.norm(delta)
-        angle_to_target = np.arctan2(delta[0], delta[1])
-        
-        self.quad.extended_state()        
-        theta = (angle_to_target - self.quad.euler[2] + np.pi) % (2*np.pi) - np.pi
+
+        delta_body=(self.quad.dcm.T)@(np.array([self.target_pos[0], self.target_pos[1], 0.0]) - self.quad.pos)
+        if np.linalg.norm(delta_body) < 1e-6:
+            theta = 0.0
+        else:
+            theta = np.arctan2(delta_body[0], delta_body[1])
+
         return r, theta
 
     def step(self, action):
@@ -283,52 +284,44 @@ class PointTrajectoryEnv(gym.Env, TrainingInfoInterface):
         # self.quadStateLog[self.quadStateLogInd, self.indrateCtrl] = self.ctrl.rateCtrl
         # self.quadStateLog[self.quadStateLogInd, self.indqd_full] = self.ctrl.qd_full
         # self.quadStateLog[self.quadStateLogInd, self.indypr] = quatToYPR_ZYX(self.ctrl.qd_full)
-        # self.quadStateLogInd += 1
+        self.quadStateLogInd += 1
         
         # Observation
-        r, theta = self._get_obs()
+        r_, theta = self._get_obs()
+        r = np.min([r_, self.max_range])
         self.theta = theta ## DEBUG
         r_dot = (r - self.last_r)/self.dt
-        theta_dot = (theta - self.last_theta)/self.dt
         self.last_r = r
         self.last_theta = theta
             # Save action history and compute running average
-        self.vf_history[self.hist_i] = self.vf
-        self.vr_history[self.hist_i] = self.vr
-        self.vf_avg = np.sum(self.vf_history)/self.history_length
-        self.vr_avg = np.sum(self.vr_history)/self.history_length
-        self.hist_i = (self.hist_i + 1) % self.history_length
-        obs = np.array([r, theta, r_dot, theta_dot,], dtype=np.float32)
+        obs = np.array([r, r_dot, sin(theta), cos(theta)], dtype=np.float32)
 
         # Reward
-        dist_part = -self.r_reward*(r**2)
-        angle_part = -(self.theta_reward * (np.sqrt(np.abs(theta))) *
-                       np.clip((np.abs(r) - self.reward_min) / (self.reward_max - self.reward_min), 0.0, 1.0))
-        action_penalty = -0.5*self.AP_factor*(np.abs(self.vf) + np.abs(self.vr))
-        avg_action_penalty = -self.AP_factor*(np.abs(self.vf-self.vf_avg) + np.abs(self.vr-self.vr_avg))
-        goal_reward = self.goal_factor if r<self.goal_radius else 0.0
-        reward = dist_part + 0.0*angle_part + action_penalty + avg_action_penalty + goal_reward
+        dist_part = -np.tan((r-self.max_range/2)*(np.pi/2)/(self.max_range+self.epsilon_r))
+        # angle_part = -(self.theta_reward * (np.sqrt(np.abs(theta))) *
+        #                np.clip((np.abs(r) - self.reward_min) / (self.reward_max - self.reward_min), 0.0, 1.0))
+        # action_penalty = -self.AP_factor*np.sqrt(self.vf*self.vf + self.vr*self.vr)
+        # avg_action_penalty = -self.AP_factor*(np.abs(self.vf-self.vf_avg) + np.abs(self.vr-self.vr_avg))
+        # goal_reward = self.goal_factor*(self.goal_radius/(r+self.goal_radius))
+        reward = (dist_part) / self.max_steps # normalize by episode length
 
         # Accumulate per-episode reward components for TensorBoard
-        self.ep_stats['dist']    += float(dist_part)
-        self.ep_stats['angle']   += float(angle_part)
-        self.ep_stats['act_pen'] += float(action_penalty)
-        self.ep_stats['total']   += float(reward)
+        # self.ep_stats['dist']    += float(dist_part)
+        # self.ep_stats['act_pen'] += float(action_penalty)
+        # self.ep_stats['total']   += float(reward)
 
         self.vf_cmd = self.vf
         self.vr_cmd = self.vr
         self.w_cmd = self.w
-
+  
         # Termination
         self.step_count += 1
         truncated = self.step_count >= self.max_steps
-        info = {"r":float(r), "theta":float(theta), "r_dot":float(r_dot), "theta_dot":float(theta_dot)}
+        info = {"r":float(r), "theta":float(theta), "r_dot":float(r_dot)}
         # Attach episode-end stats so Sample Factory logs to TensorBoard
         if truncated:
             steps = max(1, self.step_count)
             info['episode_extra_stats'] = {
-                'R_ep/dist_sum':  float(self.ep_stats['dist']),
-                'R_ep/angle_sum': float(self.ep_stats['angle']),
                 'R_ep/action_sum': float(self.ep_stats['act_pen']),
                 'R_ep/total_sum': float(self.ep_stats['total']),
                 'R_ep/dist_mean':  float(self.ep_stats['dist'])  / steps,
@@ -336,8 +329,9 @@ class PointTrajectoryEnv(gym.Env, TrainingInfoInterface):
                 'R_ep/act_mean':   float(self.ep_stats['act_pen'])/ steps,
                 'R_ep/total_mean': float(self.ep_stats['total']) / steps,
             }
-        if self.render_mode=='human': 
-            self.reward_all.append(np.array([dist_part, action_penalty, avg_action_penalty, goal_reward, reward]))
+        if self.render_mode=='human':
+            dummy = np.zeros_like(dist_part)
+            self.reward_all.append(np.array([dist_part, dummy, dummy, dummy, reward]))
             if truncated: self._finalize_render()
         return obs, reward, False, truncated, info
 
@@ -410,6 +404,7 @@ class PointTrajectoryEnv(gym.Env, TrainingInfoInterface):
         except Exception as e:
             print(f"Target position: {self.target_pos}")
             plt.plot(time_arr, pos_all[:,0]);plt.plot(time_arr, pos_all[:,1])
+            plt.plot(time_arr, vel_all[:,0]);plt.plot(time_arr, vel_all[:,1])
             plt.show()
             print(f"makeFigures failed: {e}")
 

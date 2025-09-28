@@ -589,7 +589,7 @@ def minSomethingTraj_faststop(waypoints, times, order):
 ## Testing scripts
 
 def testXYZposition(t):
-    desPos = np.array([10., 0., 0.])
+    desPos = np.array([20, 0., 0.])
     desVel = np.array([0., 0., 0.])
     desAcc = np.array([0., 0., 0.])
     desThr = np.array([0., 0., 0.])
