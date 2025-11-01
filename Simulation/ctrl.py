@@ -19,7 +19,10 @@ from numpy.linalg import norm
 import utils
 import config
 from SF_Enjoy import SF_Enjoy_main
+from rl_policyClean import RLPolicyClean
+from rl_policy import RLPolicy
 from copy import deepcopy
+import torch
 
 rad2deg = 180.0/pi
 deg2rad = pi/180.0
@@ -35,7 +38,7 @@ Pz    = 1.0
 pos_P_gain = np.array([Px, Py, Pz])
 
 # Velocity P-D gains
-Pxdot = 5.0  #*4  #*2*2
+Pxdot = 5.0
 Dxdot = 0.5
 Ixdot = 5.0
 
@@ -43,7 +46,7 @@ Pydot = Pxdot
 Dydot = Dxdot
 Iydot = Ixdot
 
-Pzdot = 4.0*10   #*6*6
+Pzdot = 4.0
 Dzdot = 0.5
 Izdot = 5.0
 
@@ -60,14 +63,14 @@ PpsiStrong = 8
 att_P_gain = np.array([Pphi, Ptheta, Ppsi])
 
 # Rate P-D gains
-Pp = 1.5   #*0.25
-Dp = 0.04   #*0.25
+Pp = 1.5/2   #*0.25
+Dp = 0.04/2   #*0.25
 
 Pq = Pp
 Dq = Dp 
 
-Pr = 1.0   #*0.25
-Dr = 0.13   #*0.25
+Pr = 1.0
+Dr = 0.1
 
 rate_P_gain = np.array([Pp, Pq, Pr])
 rate_D_gain = np.array([Dp, Dq, Dr])
@@ -111,22 +114,22 @@ class Control:
         self.yawFF     = np.zeros(3)
         sf_enjoy, self.hxs = SF_Enjoy_main()
         self.policy = sf_enjoy.enjoy
-        
+        self.rl_policyClean = RLPolicyClean.load_from_checkpoint(
+            path=f"./train_dir/relu_r/checkpoint_p0/best_000007954_8144896_reward_121.191.pth",
+            device="cpu",
+            nonlinearity="relu",
+            jit_encoder=True,
+        )
+
         # RL control
         self.history_length = 3
         self.last_r = 0.0
         self.last_theta = 0.0
-        self.vf_history = np.zeros(self.history_length)
-        self.vr_history = np.zeros(self.history_length)
-        self.vf_avg = 0.0
-        self.vr_avg = 0.0
         self.vf = 0.0
         self.vr = 0.0
-        self.hist_i = 0 
         self.pos_control_dt = control_dt
         self.current_time = 0.0
         self.next_pos_control_time = self.current_time
-        self.action_mean = np.zeros(2)
         self.obs = np.zeros(4)
         
     def controller(self, traj, quad, sDes, Ts):
@@ -137,6 +140,7 @@ class Control:
         # ---------------------------
         if (traj.ctrlType == "xyz_pos"):
             self.pos_sp[:]    = sDes[0:3]
+            self.eul_sp[:]    = sDes[12:15]
             self.xy_pos_control(quad, Ts)
             self.z_pos_control(quad, Ts)
             self.saturateVel()
@@ -213,31 +217,23 @@ class Control:
             theta = 0.0
         else:
             theta = np.arctan2(delta_body[0], delta_body[1])
-        theta = (theta + np.pi) % (2*np.pi) - np.pi
-
-        if self.current_time == 0:
-            r_dot = 0
-            theta_dot = 0
-        else:
-            r_dot = (r - self.last_r)/self.pos_control_dt
-            theta_dot = (theta - self.last_theta)/self.pos_control_dt
-            
-        self.last_r = r
-        self.last_theta = theta
+          
+        quad.extended_state()
+        heading_error = self.eul_sp[2] - quad.psi
             # Save action history and compute running average
+        self.obs = np.array([[r, np.sin(theta), np.cos(theta)]], dtype=np.float32)
+        actions, rnn_states_out, self.action_logits, normalized_obs = self.policy(self.obs, self.hxs)        
+        rl_action_logitsClean, rl_hxsClean = self.rl_policyClean(self.obs[0])
 
-        self.vf_history[self.hist_i] = self.vf
-        self.vr_history[self.hist_i] = self.vr
-        self.vf_avg = np.sum(self.vf_history)/self.history_length
-        self.vr_avg = np.sum(self.vr_history)/self.history_length
-        self.hist_i = (self.hist_i + 1) % self.history_length
-        self.obs = np.array([[r, 0.0, np.sin(theta), np.cos(theta)]], dtype=np.float32)
-        actions, rnn_states_out, self.action_mean, action_logstd = self.policy(self.obs, self.hxs) 
+        self.action_mean = self.action_logits[0][0:3]
+        self.action_logstd = self.action_logits[0][3:6]
+
         self.hxs = deepcopy(rnn_states_out)
-        self.vf, self.vr = np.array(self.action_mean[0:2])    
-        # self.vel_sp[0:2] = np.array([self.vf, self.vr])
+        self.vf, self.vr, yaw_rate = np.array(self.action_mean); yaw_rate = 0
+
         self.vel_sp = quad.dcm@np.array([self.vf, self.vr, 0])
-        # self.vel_sp[0:2] = vel_sp[0:2]
+        self.yawFF[2] = yaw_rate
+
         pass
         
     def saturateVel(self):

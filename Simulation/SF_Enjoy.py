@@ -143,7 +143,7 @@ def point_trajectory_override_defaults(env, parser: argparse.ArgumentParser):
     )
 
 def parse_args(argv=None, evaluation=False):
-    argv = ['--env=point_trajectory', '--experiment=RotationDynamicMaxRange', '--train_dir=./train_dir', '--load_checkpoint_kind', 'best', '--eval_deterministic=True', '--video_frames=300', '--device=cpu']
+    argv = ['--env=point_trajectory', '--experiment=relu_r', '--train_dir=./train_dir', '--load_checkpoint_kind', 'best', '--eval_deterministic=True', '--video_frames=300', '--device=cpu', '--nonlinearity','relu']
     parser, partial_cfg = parse_sf_args(argv=argv, evaluation=evaluation)
     add_point_env_args(partial_cfg.env, parser, evaluation=evaluation)
     point_trajectory_override_defaults(partial_cfg.env, parser)
@@ -220,6 +220,5 @@ class SF_Enjoy:
             actions = preprocess_actions(self.env_info, actions)
 
             rnn_states_out = policy_outputs["new_rnn_states"]
-            action_mean = policy_outputs["action_logits"][0][0:3]
-            action_logstd = policy_outputs["action_logits"][0][3:6]
-        return actions, rnn_states_out, action_mean, action_logstd
+            action_logits = policy_outputs["action_logits"]
+        return actions, rnn_states_out, action_logits, normalized_obs
