@@ -13,14 +13,15 @@ Please feel free to use and modify this, but keep the above information. Thanks!
 # Rate Control based on https://github.com/PX4/Firmware/blob/master/src/modules/mc_att_control/mc_att_control_main.cpp
 
 import numpy as np
+import os
 from numpy import pi
 from numpy import sin, cos, tan, sqrt
 from numpy.linalg import norm
 import utils
 import config
-from SF_Enjoy import SF_Enjoy_main
+# from SF_Enjoy import SF_Enjoy_main
 from rl_policyClean import RLPolicyClean
-from rl_policy import RLPolicy
+# from rl_policy import RLPolicy
 from copy import deepcopy
 import torch
 
@@ -112,10 +113,13 @@ class Control:
         self.eul_sp    = np.zeros(3)
         self.pqr_sp    = np.zeros(3)
         self.yawFF     = np.zeros(3)
-        sf_enjoy, self.hxs = SF_Enjoy_main()
-        self.policy = sf_enjoy.enjoy
+        # sf_enjoy, self.hxs = SF_Enjoy_main()
+        # self.policy = sf_enjoy.enjoy
+        # Get absolute path to checkpoint
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        checkpoint_path = os.path.join(project_root, 'train_dir', 'relu_r', 'checkpoint_p0', 'best_000007954_8144896_reward_121.191.pth')
         self.rl_policyClean = RLPolicyClean.load_from_checkpoint(
-            path=f"./train_dir/relu_r/checkpoint_p0/best_000007954_8144896_reward_121.191.pth",
+            path=checkpoint_path,
             device="cpu",
             nonlinearity="relu",
             jit_encoder=True,
@@ -222,14 +226,15 @@ class Control:
         heading_error = self.eul_sp[2] - quad.psi
             # Save action history and compute running average
         self.obs = np.array([[r, np.sin(theta), np.cos(theta)]], dtype=np.float32)
-        actions, rnn_states_out, self.action_logits, normalized_obs = self.policy(self.obs, self.hxs)        
+        # actions, rnn_states_out, self.action_logits, normalized_obs = self.policy(self.obs, self.hxs)
+        # rl_policyClean runs independently with its own internal hidden state (no synchronization)
         rl_action_logitsClean, rl_hxsClean = self.rl_policyClean(self.obs[0])
 
-        self.action_mean = self.action_logits[0][0:3]
-        self.action_logstd = self.action_logits[0][3:6]
+        self.action_mean = rl_action_logitsClean[0][0:3]  #self.action_logits[0][0:3]
+        self.action_logstd = rl_action_logitsClean[0][3:6]  #self.action_logits[0][3:6]
 
-        self.hxs = deepcopy(rnn_states_out)
-        self.vf, self.vr, yaw_rate = np.array(self.action_mean); yaw_rate = 0
+        # self.hxs = deepcopy(rnn_states_out)
+        self.vf, self.vr, yaw_rate = np.array(self.action_mean.detach().numpy()); yaw_rate = 0
 
         self.vel_sp = quad.dcm@np.array([self.vf, self.vr, 0])
         self.yawFF[2] = yaw_rate

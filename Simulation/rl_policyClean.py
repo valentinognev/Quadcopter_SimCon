@@ -35,21 +35,24 @@ class RLPolicyClean(nn.Module):
     def forward(self, obs: torch.Tensor, *, normalized: bool = False):
         # Normalize exactly like SF when inputs are raw
         obs = torch.tensor(obs, dtype=torch.float32)
+        # Ensure observation has batch dimension [batch, features]
+        if obs.dim() == 1:
+            obs = obs.unsqueeze(0)  # [features] -> [1, features]
         if not normalized:
             x = (obs - self.obs_mean) / torch.sqrt(self.obs_var + EPS)
             x = torch.clamp(x, -5.0, 5.0)
         else:
             x = obs
 
-        # Encoder MLP
-        x = self.encoder(x)
+        # Encoder MLP expects [batch, features]
+        x = self.encoder(x)  # [batch, encoder_out]
 
         # GRU expects [seq_len, batch, features]; hxs is [num_layers, batch, hidden]
-        x = x.unsqueeze(0)
+        x = x.unsqueeze(0)  # [batch, features] -> [1, batch, features]
         if self.hxs is None or self.hxs.shape[1] != x.shape[1]:
-            self.hxs = torch.zeros(1, self.core.hidden_size, device=x.device)
+            self.hxs = torch.zeros(1, x.shape[1], self.core.hidden_size, device=x.device)
         x, h_next = self.core(x, self.hxs)
-        x = x.squeeze(0)
+        x = x.squeeze(0)  # [1, batch, hidden] -> [batch, hidden]
         # Keep internal hidden state for next call
         self.hxs = h_next
 
@@ -78,7 +81,7 @@ class RLPolicyClean(nn.Module):
         """Reset internal RNN state to zeros for the given batch size."""
         if device is None:
             device = next(self.parameters()).device
-        self.hxs = torch.zeros(1, self.core.hidden_size, device=device)
+        self.hxs = torch.zeros(1, batch_size, self.core.hidden_size, device=device)
 
     def set_hidden_state(self, hxs: torch.Tensor) -> None:
         """Set internal RNN state to match external state.

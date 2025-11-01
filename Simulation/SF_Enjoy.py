@@ -1,3 +1,4 @@
+import os
 import time
 from collections import deque
 from typing import Dict, Tuple
@@ -143,7 +144,11 @@ def point_trajectory_override_defaults(env, parser: argparse.ArgumentParser):
     )
 
 def parse_args(argv=None, evaluation=False):
-    argv = ['--env=point_trajectory', '--experiment=relu_r', '--train_dir=./train_dir', '--load_checkpoint_kind', 'best', '--eval_deterministic=True', '--video_frames=300', '--device=cpu', '--nonlinearity','relu']
+
+    # Get the project root directory (parent of Simulation directory)
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    train_dir = os.path.join(project_root, 'train_dir')
+    argv = ['--env=point_trajectory', '--experiment=relu_r', f'--train_dir={train_dir}', '--load_checkpoint_kind', 'best', '--eval_deterministic=True', '--video_frames=300', '--device=cpu', '--nonlinearity','relu']
     parser, partial_cfg = parse_sf_args(argv=argv, evaluation=evaluation)
     add_point_env_args(partial_cfg.env, parser, evaluation=evaluation)
     point_trajectory_override_defaults(partial_cfg.env, parser)
