@@ -41,7 +41,7 @@ class Quadcopter:
         self.quat  = self.state[3:7]
         self.vel   = self.state[7:10]
         self.omega = self.state[10:13]
-        self.wMotor = np.array([self.state[13], self.state[15], self.state[17], self.state[19]])
+        self.wMotor = np.array([self.state[13], self.state[14], self.state[15], self.state[16]])
         self.vel_dot = np.zeros(3)
         self.omega_dot = np.zeros(3)
         self.acc = np.zeros(3)
@@ -91,8 +91,8 @@ class Quadcopter:
         kTh  = self.params["kTh"]
         kTo  = self.params["kTo"]
         tau  = self.params["tau"]
-        kp   = self.params["kp"]
-        damp = self.params["damp"]
+        # kp   = self.params["kp"]
+        # damp = self.params["damp"]
         minWmotor = self.params["minWmotor"]
         maxWmotor = self.params["maxWmotor"]
 
@@ -118,22 +118,18 @@ class Quadcopter:
         q      = state[11]
         r      = state[12]
         wM1    = state[13]
-        wdotM1 = state[14]
-        wM2    = state[15]
-        wdotM2 = state[16]
-        wM3    = state[17]
-        wdotM3 = state[18]
-        wM4    = state[19]
-        wdotM4 = state[20]
+        wM2    = state[14]
+        wM3    = state[15]
+        wM4    = state[16]
 
         # Motor Dynamics and Rotor forces (Second Order System: https://apmonitor.com/pdc/index.php/Main/SecondOrderSystems)
         # ---------------------------
         
         uMotor = cmd
-        wddotM1 = (-2.0*damp*tau*wdotM1 - wM1 + kp*uMotor[0])/(tau**2)
-        wddotM2 = (-2.0*damp*tau*wdotM2 - wM2 + kp*uMotor[1])/(tau**2)
-        wddotM3 = (-2.0*damp*tau*wdotM3 - wM3 + kp*uMotor[2])/(tau**2)
-        wddotM4 = (-2.0*damp*tau*wdotM4 - wM4 + kp*uMotor[3])/(tau**2)
+        wdotM1 = (- wM1 + uMotor[0])/(tau)
+        wdotM2 = (- wM2 + uMotor[1])/(tau)
+        wdotM3 = (- wM3 + uMotor[2])/(tau)
+        wdotM4 = (- wM4 + uMotor[3])/(tau)
     
         wMotor = np.array([wM1, wM2, wM3, wM4])
         wMotor = np.clip(wMotor, minWmotor, maxWmotor)
@@ -194,7 +190,7 @@ class Quadcopter:
     
         # State Derivative Vector
         # ---------------------------
-        sdot     = np.zeros([21])
+        sdot     = np.zeros([17])
         sdot[0]  = DynamicsDot[0]
         sdot[1]  = DynamicsDot[1]
         sdot[2]  = DynamicsDot[2]
@@ -209,13 +205,9 @@ class Quadcopter:
         sdot[11] = DynamicsDot[11]
         sdot[12] = DynamicsDot[12]
         sdot[13] = wdotM1
-        sdot[14] = wddotM1
-        sdot[15] = wdotM2
-        sdot[16] = wddotM2
-        sdot[17] = wdotM3
-        sdot[18] = wddotM3
-        sdot[19] = wdotM4
-        sdot[20] = wddotM4
+        sdot[14] = wdotM2
+        sdot[15] = wdotM3
+        sdot[16] = wdotM4
 
         self.acc = sdot[7:10]
 
@@ -233,7 +225,7 @@ class Quadcopter:
         self.quat  = self.state[3:7]
         self.vel   = self.state[7:10]
         self.omega = self.state[10:13]
-        self.wMotor = np.array([self.state[13], self.state[15], self.state[17], self.state[19]])
+        self.wMotor = np.array([self.state[13], self.state[14], self.state[15], self.state[16]])
 
         self.vel_dot = (self.vel - prev_vel)/Ts
         self.omega_dot = (self.omega - prev_omega)/Ts

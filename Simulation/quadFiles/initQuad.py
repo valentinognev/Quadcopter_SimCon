@@ -13,18 +13,17 @@ import utils
 import config
 
 
-def sys_params():
-    massScale = 0.45
-    geomScale = 0.45
-    mB  = 1.2*massScale       # mass (kg)
+def sys_params():   
+    # data from x500 real quadcopter
+    mB  = 2       # mass (kg)
     g   = 9.81      # gravity (m/s/s)
-    dxm = 0.16*geomScale      # arm length (m)
-    dym = 0.16*geomScale      # arm length (m)
-    dzm = 0.05*geomScale      # motor height (m)
-    IB  = np.array([[0.0123, 0,      0     ],
-                    [0,      0.0123, 0     ],
-                    [0,      0,      0.0224]])*massScale*geomScale*geomScale # Inertial tensor (kg*m^2)
-    IRzz = 2.7e-5*massScale*geomScale*geomScale   # Rotor moment of inertia (kg*m^2)
+    dxm = 0.176776695296636      # arm length (m)
+    dym = 0.176776695296636      # arm length (m)
+    dzm = 0      # motor height (m)
+    IB  = np.array([[2.1705-2, 0,      0     ],
+                    [0,      2.1304e-2, 0     ],
+                    [0,      0,      0.039396244]]) # Inertial tensor (kg*m^2)
+    IRzz = 0.039396244   # Rotor moment of inertia (kg*m^2)
 
 
     params = {}
@@ -39,22 +38,23 @@ def sys_params():
     params["useIntergral"] = bool(False)    # Include integral gains in linear velocity control
     # params["interpYaw"] = bool(False)       # Interpolate Yaw setpoints in waypoint trajectory
 
-    params["Cd"]         = 0.1
-    params["kTh"]        = 1.076e-5*(geomScale**2) # thrust coeff (N/(rad/s)^2)  (1.18e-7 N/RPM^2)
-    params["kTo"]        = 1.632e-7*(geomScale**2) # torque coeff (Nm/(rad/s)^2)  (1.79e-9 Nm/RPM^2)
+    params["Cd"]         = 0.0
+    params["kTh"]        = 15.926119900619797/(60*2*np.pi)**2 # thrust coeff (N/(rad/s)^2) 
+    params["kTo"]        = params["kTh"]*1.0847e-1            # torque coeff (Nm/(rad/s)^2) 
+    params["HoverThr"]   = 0.5549636212401485  # Thrust for hovering [%]
     params["mixerFM"]    = makeMixerFM(params) # Make mixer that calculated Thrust (F) and moments (M) as a function on motor speeds
     params["mixerFMinv"] = inv(params["mixerFM"])
-    params["minThr"]     = 0.1*4*(geomScale**2)/2    # Minimum total thrust
-    params["maxThr"]     = 9.18*4   # Maximum total thrust
-    params["minWmotor"]  = 75/geomScale       # Minimum motor rotation speed (rad/s)
-    params["maxWmotor"]  = 925/geomScale      # Maximum motor rotation speed (rad/s)
-    params["tau"]        = 0.015*geomScale    # Value for second order system for Motor dynamics
-    params["kp"]         = 1.0*geomScale      # Value for second order system for Motor dynamics
-    params["damp"]       = 1.0*geomScale      # Value for second order system for Motor dynamics
+    params["minThr"]     = 0.1*4                                         # Minimum total thrust [Nt]
+    params["maxThr"]     = params["mB"]*params["g"]/params["HoverThr"]   # Maximum total thrust [Nt]
+    params["minWmotor"]  = np.sqrt(params["minThr"]/4/params["kTh"])     # Minimum motor rotation speed (rad/s)
+    params["maxWmotor"]  = np.sqrt(params["maxThr"]/4/params["kTh"])     # Maximum motor rotation speed (rad/s)
+    params["tau"]        = 0.054    # Value for second order system for Motor dynamics
+    # params["kp"]         = 1.0*geomScale      # Value for second order system for Motor dynamics
+    # params["damp"]       = 1.0*geomScale      # Value for second order system for Motor dynamics
     
-    params["motorc1"]    = 8.49*(geomScale**2)*5     # w (rad/s) = cmd*c1 + c0 (cmd in %)
-    params["motorc0"]    = 74.7*(geomScale**2)*5
-    params["motordeadband"] = 1   
+    # params["motorc1"]    = 8.49*(geomScale**2)*5     # w (rad/s) = cmd*c1 + c0 (cmd in %)
+    # params["motorc0"]    = 74.7*(geomScale**2)*5
+    # params["motordeadband"] = 1   
     # params["ifexpo"] = bool(False)
     # if params["ifexpo"]:
     #     params["maxCmd"] = 100      # cmd (%) min and max
@@ -95,14 +95,14 @@ def init_cmd(params):
     g = params["g"]
     kTh = params["kTh"]
     kTo = params["kTo"]
-    c1 = params["motorc1"]
-    c0 = params["motorc0"]
+    # c1 = params["motorc1"]
+    # c0 = params["motorc0"]
     
     # w = cmd*c1 + c0   and   m*g/4 = kTh*w^2   and   torque = kTo*w^2
     thr_hover = mB*g/4.0
     w_hover   = np.sqrt(thr_hover/kTh)
     tor_hover = kTo*w_hover*w_hover
-    cmd_hover = (w_hover-c0)/c1
+    cmd_hover = 0
     return [cmd_hover, w_hover, thr_hover, tor_hover]
 
 def init_state(params):
@@ -119,7 +119,7 @@ def init_state(params):
     if (config.orient == "ENU"):
         z0 = -z0
 
-    s = np.zeros(21)
+    s = np.zeros(17)
     s[0]  = x0       # x
     s[1]  = y0       # y
     s[2]  = z0       # z
@@ -135,15 +135,10 @@ def init_state(params):
     s[12] = 0.       # r
 
     w_hover = params["w_hover"] # Hovering motor speed
-    wdot_hover = 0.              # Hovering motor acc
 
     s[13] = w_hover
-    s[14] = wdot_hover
+    s[14] = w_hover
     s[15] = w_hover
-    s[16] = wdot_hover
-    s[17] = w_hover
-    s[18] = wdot_hover
-    s[19] = w_hover
-    s[20] = wdot_hover
+    s[16] = w_hover
     
     return s
