@@ -14,15 +14,15 @@ import config
 
 
 def sys_params():   
-    # data from x500 real quadcopter
-    mB  = 2       # mass (kg)
+    # data from flightmare quadcopter
+    mB  = 0.73       # mass (kg)
     g   = 9.81      # gravity (m/s/s)
-    dxm = 0.176776695296636      # arm length (m)
-    dym = 0.176776695296636      # arm length (m)
+    dxm = 0.17 * 0.7071067811865475    # arm length (m)
+    dym = 0.17 * 0.7071067811865475      # arm length (m)
     dzm = 0      # motor height (m)
-    IB  = np.array([[2.1705e-2, 0,      0     ],
-                    [0,      2.1304e-2, 0     ],
-                    [0,      0,      0.039396244]]) # Inertial tensor (kg*m^2)
+    IB  = np.array([[0.00791, 0,      0     ],
+                    [0,      0.00791, 0     ],
+                    [0,      0,      0.0123]]) # Inertial tensor (kg*m^2)
     IRzz = 0.039396244   # Rotor moment of inertia (kg*m^2)
 
 
@@ -39,16 +39,16 @@ def sys_params():
     # params["interpYaw"] = bool(False)       # Interpolate Yaw setpoints in waypoint trajectory
 
     params["Cd"]         = 0.0
-    params["kTh"]        = 15.926119900619797/(60*2*np.pi)**2 # thrust coeff (N/(rad/s)^2) 
-    params["kTo"]        = params["kTh"]*1.0847e-1            # torque coeff (Nm/(rad/s)^2) 
-    params["HoverThr"]   = 0.5549636212401485  # Thrust for hovering [%]
+    params["kTh"]        = 11.968428150335603/(60*2*np.pi)**2 # thrust coeff (N/(rad/s)^2) 
+    params["kTo"]        = params["kTh"]*0.016            # torque coeff (Nm/(rad/s)^2) 
+    params["HoverThr"]   = 0.5  # Thrust for hovering [%]
     params["mixerFM"]    = makeMixerFM(params) # Make mixer that calculated Thrust (F) and moments (M) as a function on motor speeds
     params["mixerFMinv"] = inv(params["mixerFM"])
     params["minThr"]     = 0.1*4                                         # Minimum total thrust [Nt]
     params["maxThr"]     = params["mB"]*params["g"]/params["HoverThr"]   # Maximum total thrust [Nt]
     params["minWmotor"]  = np.sqrt(params["minThr"]/4/params["kTh"])     # Minimum motor rotation speed (rad/s)
     params["maxWmotor"]  = np.sqrt(params["maxThr"]/4/params["kTh"])     # Maximum motor rotation speed (rad/s)
-    params["tau"]        = 0.054    # Value for second order system for Motor dynamics
+    params["tau"]        = 0.02    # Value for second order system for Motor dynamics
     # params["kp"]         = 1.0*geomScale      # Value for second order system for Motor dynamics
     # params["damp"]       = 1.0*geomScale      # Value for second order system for Motor dynamics
     

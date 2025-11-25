@@ -34,8 +34,8 @@ pos_P_gain = np.array([Px, Py, Pz])
 
 # Velocity P-D gains
 Pxdot = 5.0*2
-Dxdot = 0.5
-Ixdot = 5.0
+Dxdot = 0.5*4
+Ixdot = 0.5
 
 Pydot = Pxdot
 Dydot = Dxdot
@@ -50,7 +50,7 @@ vel_D_gain = np.array([Dxdot, Dydot, Dzdot])
 vel_I_gain = np.array([Ixdot, Iydot, Izdot])
 
 # Attitude P gains
-Pphi = 6.0
+Pphi = 10
 Ptheta = Pphi
 Ppsi = 1.5
 PpsiStrong = 8
@@ -58,7 +58,7 @@ PpsiStrong = 8
 att_P_gain = np.array([Pphi, Ptheta, Ppsi])
 
 # Rate P-D gains
-Pp = 1.5*0.25*2
+Pp = 1.5*0.25*2*4
 Dp = 0.04*0.25*3
 
 Pq = Pp

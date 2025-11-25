@@ -14,16 +14,17 @@ deg2rad = pi/180.0
 
 def makeWaypoints():
     
-    v_average = 3
+    v_average = 1
 
     t_ini = 3
     t = np.array([4, 0, 4, 0])
     
     wp_ini = np.array([0, 0, 0])
+    # wp = np.array([[2, 0, 0]])
     wp = np.array([[2, 2, 1],
-                   [-2, 3, -2],
-                   [-2, -1, 2],
-                   [3, -2, -3],
+                   [-2, 3, -3],
+                   [-2, -1, -3],
+                   [3, -2, 1],
                    wp_ini])
 
     yaw_ini = 0    
