@@ -33,7 +33,7 @@ Pz    = 1.0
 pos_P_gain = np.array([Px, Py, Pz])
 
 # Velocity P-D gains
-Pxdot = 5.0*2*2
+Pxdot = 5.0*2
 Dxdot = 0.5
 Ixdot = 5.0
 
@@ -50,7 +50,7 @@ vel_D_gain = np.array([Dxdot, Dydot, Dzdot])
 vel_I_gain = np.array([Ixdot, Iydot, Izdot])
 
 # Attitude P gains
-Pphi = 8.0
+Pphi = 6.0
 Ptheta = Pphi
 Ppsi = 1.5
 PpsiStrong = 8
@@ -58,8 +58,8 @@ PpsiStrong = 8
 att_P_gain = np.array([Pphi, Ptheta, Ppsi])
 
 # Rate P-D gains
-Pp = 1.5*0.25
-Dp = 0.04*0.25
+Pp = 1.5*0.25*2
+Dp = 0.04*0.25*3
 
 Pq = Pp
 Dq = Dp 
@@ -71,12 +71,12 @@ rate_P_gain = np.array([Pp, Pq, Pr])
 rate_D_gain = np.array([Dp, Dq, Dr])
 
 # Max Velocities
-uMax = 5.0
-vMax = 5.0
-wMax = 5.0
+uMax = 15.0
+vMax = 15.0
+wMax = 15.0
 
 velMax = np.array([uMax, vMax, wMax])
-velMaxAll = 5.0
+velMaxAll = 15.0
 
 saturateVel_separetely = False
 

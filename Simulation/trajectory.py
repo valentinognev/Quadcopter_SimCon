@@ -109,10 +109,10 @@ class Trajectory:
             elif (t >= self.t_wps[-1]):
                 self.t_idx = -1
             else:
-                self.t_idx = np.where(t <= self.t_wps)[0][0] - 1
+                self.t_idx = np.where(t <= self.t_wps)[0][0]# - 1
             
             self.desPos = self.wps[self.t_idx,:]
-                            
+            pass                
         
         def pos_waypoint_interp():
             
@@ -131,6 +131,7 @@ class Trajectory:
                 self.t_idx = np.where(t <= self.t_wps)[0][0] - 1
                 scale = (t - self.t_wps[self.t_idx])/self.T_segment[self.t_idx]
                 self.desPos = (1 - scale) * self.wps[self.t_idx,:] + scale * self.wps[self.t_idx + 1,:]
+            pass                
         
         def pos_waypoint_min():
             """ The function takes known number of waypoints and time, then generates a
@@ -169,6 +170,7 @@ class Trajectory:
 
                 t2 = get_poly_cc(nb_coeff, 2, scale)
                 self.desAcc = np.array([self.coeff_x[start:end].dot(t2), self.coeff_y[start:end].dot(t2), self.coeff_z[start:end].dot(t2)])
+            pass                
         
         def pos_waypoint_arrived():
 
@@ -185,7 +187,8 @@ class Trajectory:
                         self.t_idx = -1
                     
             self.desPos = self.wps[self.t_idx,:]
-
+            pass                
+        
         def pos_waypoint_arrived_wait():
 
             dist_consider_arrived = 0.2     # Distance to waypoint that is considered as "arrived"
@@ -216,14 +219,15 @@ class Trajectory:
                         self.t_idx = 0                        # set to -1 to stop looping  
                     
             self.desPos = self.wps[self.t_idx,:]
-
+            pass                
+        
         def yaw_waypoint_timed():
             
             if not (len(self.t_wps) == len(self.y_wps)):
                 raise Exception("Time array and waypoint array not the same size.")
             
             self.desEul[2] = self.y_wps[self.t_idx]
-                    
+            pass                
 
         def yaw_waypoint_interp():
 
@@ -244,7 +248,7 @@ class Trajectory:
 
                 # Prepare next iteration
                 self.current_heading = self.desEul[2]
-        
+            pass                
 
         def yaw_follow():
 
@@ -286,7 +290,7 @@ class Trajectory:
 
             # Prepare next iteration
             self.current_heading = self.desEul[2]
-
+            pass                
 
         if (self.ctrlType == "xyz_vel"):
             if (self.xyzType == 1):

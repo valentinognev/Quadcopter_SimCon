@@ -20,7 +20,7 @@ def sys_params():
     dxm = 0.176776695296636      # arm length (m)
     dym = 0.176776695296636      # arm length (m)
     dzm = 0      # motor height (m)
-    IB  = np.array([[2.1705-2, 0,      0     ],
+    IB  = np.array([[2.1705e-2, 0,      0     ],
                     [0,      2.1304e-2, 0     ],
                     [0,      0,      0.039396244]]) # Inertial tensor (kg*m^2)
     IRzz = 0.039396244   # Rotor moment of inertia (kg*m^2)
