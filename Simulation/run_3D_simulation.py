@@ -17,6 +17,73 @@ from quadFiles.quad import Quadcopter
 from utils.windModel import Wind
 import utils
 import config
+from load_ulg import load_ulg
+from pyulog.core import ULog
+
+# # Load rotor parameters from ULog file
+# def load_rotor_params_from_ulog(ulog_file):
+#     """
+#     Extract rotor parameters from ULog file.
+#     Returns rotor_positions, rotor_thrust_directions, rotor_torque_directions
+#     """
+#     ulog = ULog(ulog_file)
+#     params = ulog.initial_parameters
+    
+#     'vehicle_local_position'
+#     # Get number of rotors
+#     num_rotors = int(params.get('CA_ROTOR_COUNT', 4))
+    
+#     rotor_positions = []
+#     rotor_thrust_directions = []
+#     rotor_torque_directions = []
+
+#     # rotMat_FLU_FRD=np.array([
+#     #     [1, 0, 0],
+#     #     [0, -1, 0],
+#     #     [0, 0, -1],
+#     # ])
+#     rotMat_FLU_FRD = np.eye(3)
+    
+#     for i in range(num_rotors):
+#         # Position (PX, PY, PZ)
+#         px = params.get(f'CA_ROTOR{i}_PX', 0.0)
+#         py = params.get(f'CA_ROTOR{i}_PY', 0.0)
+#         pz = params.get(f'CA_ROTOR{i}_PZ', 0.0)
+#         rotor_positions.append(rotMat_FLU_FRD @ np.array([px, py, pz]))
+        
+#         # Thrust direction (-AX, AY, -AZ) - note the sign changes for FLU frame
+#         ax = params.get(f'CA_ROTOR{i}_AX', 0.0)
+#         ay = params.get(f'CA_ROTOR{i}_AY', 0.0)
+#         az = params.get(f'CA_ROTOR{i}_AZ', 1.0)
+#         rotor_thrust_directions.append(rotMat_FLU_FRD @ np.array([ax, ay, az]))
+        
+#         # Torque direction based on sign of KM
+#         # km = params.get(f'CA_ROTOR{i}_KM', 0.05)
+#         # torque_sign = np.sign(km)
+#         # Logic based on position:
+#         # +x, +y and -x, -y -> positive torque (sign(px) == sign(py))
+#         # -x, +y and +x, -y -> negative torque (sign(px) != sign(py))
+#         # Note: px and py here are in the original frame before rotation to FRD
+#         # However, the user request says "+x,+y and -x,-y direction is positive", referring to the rotor positions.
+#         # Let's use the signs of px and py directly.
+        
+#         # Handle cases where px or py might be 0 (e.g. X or + configuration aligned with axes)
+#         # Assuming standard quadrotor configuration where rotors are in quadrants.
+#         # If px or py is 0, this logic might need refinement, but based on "CA_ROTORi_PX/PY" description it seems standard.
+#         # Let's assume standard quad X or + where they are not 0, or if 0, we might need to look at the other coordinate.
+#         # Given the user prompt: "+x,+y and -x,-y direction is positive", implies quadrants 1 and 3 are positive.
+        
+#         if np.sign(px) == np.sign(py):
+#              torque_sign = 1.0
+#         else:
+#              torque_sign = -1.0
+             
+#         rotor_torque_directions.append(rotMat_FLU_FRD @ np.array([0, 0, torque_sign]))
+    
+#     return (np.array(rotor_positions), 
+#             np.array(rotor_thrust_directions), 
+#             np.array(rotor_torque_directions))
+
 
 def quad_sim(t, Ts, quad, ctrl, wind, traj):
     
@@ -38,27 +105,31 @@ def quad_sim(t, Ts, quad, ctrl, wind, traj):
 
 def main():
     start_time = time.time()
+    ulgData = load_ulg("/home/valentin/RL/Recordings/log_1_2025-11-26-11-22-59.ulg", 
+                    fields_to_extract=[['vehicle_local_position','vx'],['vehicle_local_position','vy'],
+                                       ['vehicle_local_position_setpoint','vx'],['vehicle_local_position_setpoint','vy']],
+                    startTime=224.0)
 
     # Simulation Setup
     # --------------------------- 
     Ti = 0
     Ts = 0.002
-    Tf = 15
+    Tf = 40
     ifsave = 0
-
+ 
     # Choose trajectory settings
     # --------------------------- 
     ctrlOptions = ["xyz_pos", "xy_vel_z_pos", "xyz_vel"]
     trajSelect = np.zeros(3)
 
     # Select Control Type             (0: xyz_pos,                  1: xy_vel_z_pos,            2: xyz_vel)
-    ctrlType = ctrlOptions[0]   
+    ctrlType = ctrlOptions[1]   
     # Select Position Trajectory Type (0: hover,                    1: pos_waypoint_timed,      2: pos_waypoint_interp,    
     #                                  3: minimum velocity          4: minimum accel,           5: minimum jerk,           6: minimum snap
     #                                  7: minimum accel_stop        8: minimum jerk_stop        9: minimum snap_stop
     #                                 10: minimum jerk_full_stop   11: minimum snap_full_stop
     #                                 12: pos_waypoint_arrived     13: pos_waypoint_arrived_wait
-    trajSelect[0] = 2        
+    trajSelect[0] = 1        
     # Select Yaw Trajectory Type      (0: none                      1: yaw_waypoint_timed,      2: yaw_waypoint_interp     3: follow          4: zero)
     trajSelect[1] = 3           
     # Select if waypoint time is used, or if average speed is used to calculate waypoint time   (0: waypoint time,   1: average speed)
@@ -68,7 +139,7 @@ def main():
     # Initialize Quadcopter, Controller, Wind, Result Matrixes
     # ---------------------------
     quad = Quadcopter(Ti)
-    traj = Trajectory(quad, ctrlType, trajSelect)
+    traj = Trajectory(quad, ctrlType, trajSelect, ulgData=ulgData)
     ctrl = Control(quad, traj.yawType)
     wind = Wind('None', 2.0, 90, -15)
 
@@ -145,8 +216,17 @@ def main():
 
     # utils.fullprint(sDes_traj_all[:,3:6])
     utils.makeFigures(quad.params, t_all, pos_all, vel_all, quat_all, omega_all, euler_all, w_cmd_all, wMotor_all, thr_all, tor_all, sDes_traj_all, sDes_calc_all)
+    
+    
+    plt.figure(2)
+    plt.plot(ulgData['vehicle_local_position_vx']['timestamp'], ulgData['vehicle_local_position_vx']['data'])
+    plt.plot(ulgData['vehicle_local_position_vy']['timestamp'], ulgData['vehicle_local_position_vy']['data'])
+    plt.legend(['vx ulg', 'vy ulg'])
+    plt.xlabel('Time (s)')
+    plt.ylabel('Velocity (m/s)')
+    plt.grid(True)
     ani = utils.sameAxisAnimation(t_all, traj.wps, pos_all, quat_all, sDes_traj_all, Ts, quad.params, traj.xyzType, traj.yawType, ifsave)
-    plt.show()
+    # plt.show()
     pass
 
 if __name__ == "__main__":

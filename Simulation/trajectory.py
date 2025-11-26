@@ -12,7 +12,7 @@ Please feel free to use and modify this, but keep the above information. Thanks!
 # license: BSD
 # Please feel free to use and modify this, but keep the above information. Thanks!
 
-
+import matplotlib.pyplot as plt
 
 import numpy as np
 from numpy import pi
@@ -22,8 +22,10 @@ import config
 
 class Trajectory:
 
-    def __init__(self, quad, ctrlType, trajSelect):
+    def __init__(self, quad, ctrlType, trajSelect, ulgData=None):
 
+        self.ulgData = ulgData
+        
         self.ctrlType = ctrlType
         self.xyzType = trajSelect[0]
         self.yawType = trajSelect[1]
@@ -298,7 +300,7 @@ class Trajectory:
 
         elif (self.ctrlType == "xy_vel_z_pos"):
             if (self.xyzType == 1):
-                self.sDes = testVelControl(t)
+                self.sDes = testVelControl(t, self.ulgData)
         
         elif (self.ctrlType == "xyz_pos"):
             # Hover at [0, 0, 0]
@@ -612,7 +614,7 @@ def testXYZposition(t):
     return sDes
 
 
-def testVelControl(t):
+def testVelControl(t, ulgdata=None):
     desPos = np.array([0., 0., 0.])
     desVel = np.array([0., 0., 0.])
     desAcc = np.array([0., 0., 0.])
@@ -621,10 +623,26 @@ def testVelControl(t):
     desPQR = np.array([0., 0., 0.])
     desYawRate = 0.
 
-    if t >= 1 and t < 4:
-        desVel = np.array([3, 2, 0])
-    elif t >= 4:
-        desVel = np.array([3, -1, 0])
+    # Interpolate desired vx and vy from ulgData setpoint fields if available
+    if ulgdata is not None:
+        # Interpolate vx
+        vx_data = ulgdata['vehicle_local_position_setpoint_vx']
+        timestamps = vx_data['timestamp']
+        values = vx_data['data']
+        desVel[0] = np.interp(t, timestamps, values, left=0.0, right=0.0)
+        
+        # Interpolate vy
+        vy_data = ulgdata['vehicle_local_position_setpoint_vy']
+        timestamps = vy_data['timestamp']
+        values = vy_data['data']
+        desVel[1] = np.interp(t, timestamps, values, left=0.0, right=0.0)
+        pass
+    else:
+        # Fallback to hardcoded values if ulgdata not provided
+        if t >= 1 and t < 4:
+            desVel = np.array([3, 2, 0])
+        elif t >= 4:
+            desVel = np.array([3, -1, 0])
      
     sDes = np.hstack((desPos, desVel, desAcc, desThr, desEul, desPQR, desYawRate)).astype(float)
     
