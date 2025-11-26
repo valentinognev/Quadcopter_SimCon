@@ -58,7 +58,7 @@ PpsiStrong = 8
 att_P_gain = np.array([Pphi, Ptheta, Ppsi])
 
 # Rate P-D gains
-Pp = 1.5*0.25*2*4
+Pp = 1.5*0.25*2*2
 Dp = 0.04*0.25*3
 
 Pq = Pp
