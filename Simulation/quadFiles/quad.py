@@ -51,7 +51,7 @@ class Quadcopter:
 
         # Set Integrator
         # ---------------------------
-        self.integrator = ode(self.state_dot).set_integrator('dopri5', first_step='0.00005', atol='10e-6', rtol='10e-6')
+        self.integrator = ode(self.state_dot).set_integrator('dopri5', first_step='0.00005', atol='1e-6', rtol='1e-6')
         self.integrator.set_initial_value(self.state, Ti)
 
 

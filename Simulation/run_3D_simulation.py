@@ -20,6 +20,9 @@ import config
 from load_ulg import load_ulg
 from pyulog.core import ULog
 
+
+LOAD_ULG_DATA = True
+
 # # Load rotor parameters from ULog file
 # def load_rotor_params_from_ulog(ulog_file):
 #     """
@@ -105,16 +108,19 @@ def quad_sim(t, Ts, quad, ctrl, wind, traj):
 
 def main():
     start_time = time.time()
-    ulgData = load_ulg("/home/valentin/RL/Recordings/log_1_2025-11-26-11-22-59.ulg", 
-                    fields_to_extract=[['vehicle_local_position','vx'],['vehicle_local_position','vy'],
-                                       ['vehicle_local_position_setpoint','vx'],['vehicle_local_position_setpoint','vy']],
-                    startTime=224.0)
+    if LOAD_ULG_DATA:
+        ulgData = load_ulg("/home/valentin/Projects/GambitonBiut/Recordings/CAT_SYS_IDENT/5blades1550/log_11_2025-12-1-14-00-38.ulg", 
+                        fields_to_extract=[['vehicle_local_position','vx'],['vehicle_local_position','vy'],
+                                        ['vehicle_local_position_setpoint','vx'],['vehicle_local_position_setpoint','vy']],
+                        startTime=8)
+    else:
+        ulgData = None
 
     # Simulation Setup
     # --------------------------- 
     Ti = 0
     Ts = 0.002
-    Tf = 40
+    Tf = 50
     ifsave = 0
  
     # Choose trajectory settings
@@ -123,13 +129,13 @@ def main():
     trajSelect = np.zeros(3)
 
     # Select Control Type             (0: xyz_pos,                  1: xy_vel_z_pos,            2: xyz_vel)
-    ctrlType = ctrlOptions[1]   
+    ctrlType = ctrlOptions[1] if LOAD_ULG_DATA else ctrlOptions[0]
     # Select Position Trajectory Type (0: hover,                    1: pos_waypoint_timed,      2: pos_waypoint_interp,    
     #                                  3: minimum velocity          4: minimum accel,           5: minimum jerk,           6: minimum snap
     #                                  7: minimum accel_stop        8: minimum jerk_stop        9: minimum snap_stop
     #                                 10: minimum jerk_full_stop   11: minimum snap_full_stop
     #                                 12: pos_waypoint_arrived     13: pos_waypoint_arrived_wait
-    trajSelect[0] = 1        
+    trajSelect[0] = 1 if LOAD_ULG_DATA else 99        
     # Select Yaw Trajectory Type      (0: none                      1: yaw_waypoint_timed,      2: yaw_waypoint_interp     3: follow          4: zero)
     trajSelect[1] = 3           
     # Select if waypoint time is used, or if average speed is used to calculate waypoint time   (0: waypoint time,   1: average speed)
@@ -139,7 +145,7 @@ def main():
     # Initialize Quadcopter, Controller, Wind, Result Matrixes
     # ---------------------------
     quad = Quadcopter(Ti)
-    traj = Trajectory(quad, ctrlType, trajSelect, ulgData=ulgData)
+    traj = Trajectory(quad, ctrlType, trajSelect, ulgData=None if ulgData is None else ulgData)
     ctrl = Control(quad, traj.yawType)
     wind = Wind('None', 2.0, 90, -15)
 
@@ -217,14 +223,15 @@ def main():
     # utils.fullprint(sDes_traj_all[:,3:6])
     utils.makeFigures(quad.params, t_all, pos_all, vel_all, quat_all, omega_all, euler_all, w_cmd_all, wMotor_all, thr_all, tor_all, sDes_traj_all, sDes_calc_all)
     
-    
-    plt.figure(2)
-    plt.plot(ulgData['vehicle_local_position_vx']['timestamp'], ulgData['vehicle_local_position_vx']['data'])
-    plt.plot(ulgData['vehicle_local_position_vy']['timestamp'], ulgData['vehicle_local_position_vy']['data'])
-    plt.legend(['vx ulg', 'vy ulg'])
-    plt.xlabel('Time (s)')
-    plt.ylabel('Velocity (m/s)')
-    plt.grid(True)
+    if LOAD_ULG_DATA:
+        plt.figure(2)
+        plt.plot(ulgData['vehicle_local_position_vx']['timestamp'], ulgData['vehicle_local_position_vx']['data'])
+        plt.plot(ulgData['vehicle_local_position_vy']['timestamp'], ulgData['vehicle_local_position_vy']['data'])
+        plt.legend(['vx ulg', 'vy ulg'])
+        plt.xlabel('Time (s)')
+        plt.ylabel('Velocity (m/s)')
+        plt.grid(True)
+        
     ani = utils.sameAxisAnimation(t_all, traj.wps, pos_all, quat_all, sDes_traj_all, Ts, quad.params, traj.xyzType, traj.yawType, ifsave)
     # plt.show()
     pass

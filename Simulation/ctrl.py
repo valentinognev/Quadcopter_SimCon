@@ -18,6 +18,7 @@ from numpy import sin, cos, tan, sqrt
 from numpy.linalg import norm
 import utils
 import config
+from copy import deepcopy
 
 rad2deg = 180.0/pi
 deg2rad = pi/180.0
@@ -26,28 +27,36 @@ deg2rad = pi/180.0
 # ---------------------------
 
 # Position P gains
-Py    = 1.0
+Py    = 1.0*.7
 Px    = Py
 Pz    = 1.0
 
 pos_P_gain = np.array([Px, Py, Pz])
 
 # Velocity P-D gains
-Pxdot = 4.0
-Dxdot = 0.5*4
+Pxdot = 1.5
+Dxdot = 1
 Ixdot = 0.5
+FFxdot = 0.0
+FFdxdot = 1.1
 
 Pydot = Pxdot
 Dydot = Dxdot
 Iydot = Ixdot
+FFydot = FFxdot
+FFdydot = FFdxdot
 
 Pzdot = 4.0*6*6
 Dzdot = 0.5
 Izdot = 5.0
+FFzdot = 0.0
+FFdzdot = 0.0
 
 vel_P_gain = np.array([Pxdot, Pydot, Pzdot])
 vel_D_gain = np.array([Dxdot, Dydot, Dzdot])
 vel_I_gain = np.array([Ixdot, Iydot, Izdot])
+vel_FF_gain = np.array([FFxdot, FFydot, FFzdot])
+vel_FF_dot_gain = np.array([FFdxdot, FFdydot, FFdzdot])
 
 # Attitude P gains
 Pphi = 10
@@ -58,14 +67,14 @@ PpsiStrong = 8
 att_P_gain = np.array([Pphi, Ptheta, Ppsi])
 
 # Rate P-D gains
-Pp = 1.5*0.25*2*2
-Dp = 0.04*0.25*3
+Pp = 1.5*0.25*2
+Dp = 0.04*0.25*2
 
 Pq = Pp
 Dq = Dp 
 
-Pr = 1.0*0.25
-Dr = 0.1*0.25
+Pr = 1.0*0.25*1.2
+Dr = 0.1*0.25*1.2
 
 rate_P_gain = np.array([Pp, Pq, Pr])
 rate_D_gain = np.array([Dp, Dq, Dr])
@@ -107,7 +116,8 @@ class Control:
         self.eul_sp    = np.zeros(3)
         self.pqr_sp    = np.zeros(3)
         self.yawFF     = np.zeros(3)
-
+        
+        self.prevVel_sp = np.zeros(3)
     
     def controller(self, traj, quad, sDes, Ts):
 
@@ -159,7 +169,8 @@ class Control:
         self.sDesCalc[6:9] = self.thrust_sp
         self.sDesCalc[9:13] = self.qd
         self.sDesCalc[13:16] = self.rate_sp
-
+        
+        self.prevVel_sp = deepcopy(self.vel_sp)
 
     def z_pos_control(self, quad, Ts):
        
@@ -196,11 +207,12 @@ class Control:
         # ---------------------------
         # Hover thrust (m*g) is sent as a Feed-Forward term, in order to 
         # allow hover when the position and velocity error are nul
+        vel_sp_dot = (self.vel_sp - self.prevVel_sp)/Ts
         vel_z_error = self.vel_sp[2] - quad.vel[2]
         if (config.orient == "NED"):
-            thrust_z_sp = vel_P_gain[2]*vel_z_error - vel_D_gain[2]*quad.vel_dot[2] + quad.params["mB"]*(self.acc_sp[2] - quad.params["g"]) + self.thr_int[2]
+            thrust_z_sp = vel_P_gain[2]*vel_z_error - vel_D_gain[2]*quad.vel_dot[2] + quad.params["mB"]*(self.acc_sp[2] - quad.params["g"]) + self.thr_int[2] + vel_FF_gain[2]*self.vel_sp[2] + vel_FF_dot_gain[2]*vel_sp_dot[2]
         elif (config.orient == "ENU"):
-            thrust_z_sp = vel_P_gain[2]*vel_z_error - vel_D_gain[2]*quad.vel_dot[2] + quad.params["mB"]*(self.acc_sp[2] + quad.params["g"]) + self.thr_int[2]
+            thrust_z_sp = vel_P_gain[2]*vel_z_error - vel_D_gain[2]*quad.vel_dot[2] + quad.params["mB"]*(self.acc_sp[2] + quad.params["g"]) + self.thr_int[2] + vel_FF_gain[2]*self.vel_sp[2] + vel_FF_dot_gain[2]*vel_sp_dot[2]
         
         # Get thrust limits
         if (config.orient == "NED"):
@@ -228,8 +240,9 @@ class Control:
         
         # XY Velocity Control (Thrust in NE-direction)
         # ---------------------------
+        vel_sp_dot = (self.vel_sp - self.prevVel_sp)/Ts
         vel_xy_error = self.vel_sp[0:2] - quad.vel[0:2]
-        thrust_xy_sp = vel_P_gain[0:2]*vel_xy_error - vel_D_gain[0:2]*quad.vel_dot[0:2] + quad.params["mB"]*(self.acc_sp[0:2]) + self.thr_int[0:2]
+        thrust_xy_sp = vel_P_gain[0:2]*vel_xy_error - vel_D_gain[0:2]*quad.vel_dot[0:2] + quad.params["mB"]*(self.acc_sp[0:2]) + self.thr_int[0:2] + vel_FF_gain[0:2]*self.vel_sp[0:2] + vel_FF_dot_gain[0:2]*vel_sp_dot[0:2]
 
         # Max allowed thrust in NE based on tilt and excess thrust
         thrust_max_xy_tilt = abs(self.thrust_sp[2])*np.tan(tiltMax)
