@@ -109,10 +109,14 @@ def quad_sim(t, Ts, quad, ctrl, wind, traj):
 def main():
     start_time = time.time()
     if LOAD_ULG_DATA:
-        ulgData = load_ulg("/home/valentin/Projects/GambitonBiut/Recordings/CAT_SYS_IDENT/5blades1550/log_11_2025-12-1-14-00-38.ulg", 
+    #    ulgData = load_ulg("/home/valentin/Projects/GambitonBiut/Recordings/CAT_SYS_IDENT/5blades1550/log_11_2025-12-1-14-00-38.ulg", 
+    #                     fields_to_extract=[['vehicle_local_position','vx'],['vehicle_local_position','vy'],
+    #                                     ['vehicle_local_position_setpoint','vx'],['vehicle_local_position_setpoint','vy']],
+    #                     startTime=8)
+        ulgData = load_ulg("/home/valentin/RL/TESTFLIGHTS/sininput.ulg", 
                         fields_to_extract=[['vehicle_local_position','vx'],['vehicle_local_position','vy'],
                                         ['vehicle_local_position_setpoint','vx'],['vehicle_local_position_setpoint','vy']],
-                        startTime=8)
+                        startTime=264)
     else:
         ulgData = None
 
@@ -194,7 +198,8 @@ def main():
     t = Ti
     i = 1
     while round(t,3) < Tf:
-        
+        if t>6:
+            pass
         t = quad_sim(t, Ts, quad, ctrl, wind, traj)
         
         # print("{:.3f}".format(t))

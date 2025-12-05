@@ -34,11 +34,11 @@ Pz    = 1.0
 pos_P_gain = np.array([Px, Py, Pz])
 
 # Velocity P-D gains
-Pxdot = 1.5
+Pxdot = 3
 Dxdot = 1
 Ixdot = 0.5
-FFxdot = 0.0
-FFdxdot = 1.1
+FFxdot = 0.5
+FFdxdot = 0.25
 
 Pydot = Pxdot
 Dydot = Dxdot
