@@ -1,7 +1,9 @@
 import pandas as pd
 import numpy as np
 from pyulog.core import ULog
+from pyulog.px4 import PX4ULog
 import matplotlib.pyplot as plt
+from copy import deepcopy
 
 def load_ulg(ulog_file_name, timestamp_field="timestamp", msg_filter=None, disable_str_exceptions=False, 
              verbose=False, relative_timestamps=True, skip_first_n=20, fields_to_extract=None, startTime=None):
@@ -30,15 +32,25 @@ def load_ulg(ulog_file_name, timestamp_field="timestamp", msg_filter=None, disab
         Format: {'section_name_field_name': {'timestamp': np.array, 'data': np.array}, ...}
     """
     ulog = ULog(ulog_file_name, msg_filter, disable_str_exceptions)
-    data = ulog.data_list
     result = {}  # Dictionary to store results: {field_id: {'timestamp': array, 'data': array}}
+    px4_ulog = PX4ULog(ulog)
+    px4_ulog.add_roll_pitch_yaw()
+    ulog = deepcopy(px4_ulog._ulog)
+    data = ulog.data_list  # Use updated data_list after adding roll_pitch_yaw
+    
+    # Debug: Print available fields after add_roll_pitch_yaw if verbose
+    if verbose:
+        print("\nAvailable sections and fields after add_roll_pitch_yaw():")
+        for d in data:
+            section_fields = [f.field_name for f in d.field_data]
+            print(f"  {d.name}: {section_fields}")
     
     # Convert fields_to_extract to a set of tuples for faster lookup
     fields_set = None
     if fields_to_extract is not None:
         fields_set = set((section, field) for section, field in fields_to_extract)
         if verbose:
-            print(f"Extracting {len(fields_set)} specific fields: {fields_to_extract}")
+            print(f"\nExtracting {len(fields_set)} specific fields: {fields_to_extract}")
     
     # List of possible timestamp field names to try (in order of preference)
     timestamp_field_candidates = [timestamp_field, "timestamp_sample", "timestamp"]
@@ -52,16 +64,23 @@ def load_ulg(ulog_file_name, timestamp_field="timestamp", msg_filter=None, disab
         # Skip this section if fields_to_extract is specified and this section is not in the list
         if fields_set is not None:
             # Check if any field from this section is requested
-            section_fields = [f.field_name for f in d.field_data]
+            # Get fields from both field_data and data.keys() to catch fields added by add_roll_pitch_yaw()
+            section_fields_from_field_data = [f.field_name for f in d.field_data]
+            section_fields_from_data = list(d.data.keys())
+            section_fields = list(dict.fromkeys(section_fields_from_field_data + section_fields_from_data))
             section_requested = any((d.name, field) in fields_set for field in section_fields)
             if not section_requested:
                 if verbose:
                     print(f"Skipping section {d.name} (not in fields_to_extract)")
                 continue
-        data_keys = [f.field_name for f in d.field_data]
+        # Get field names from both field_data and data.keys() to catch fields added by add_roll_pitch_yaw()
+        data_keys_from_field_data = [f.field_name for f in d.field_data]
+        data_keys_from_data = list(d.data.keys())
+        # Combine and remove duplicates, preserving order
+        data_keys = list(dict.fromkeys(data_keys_from_field_data + data_keys_from_data))
 
         assert(len(data_keys) > 0)
-        assert(all([len(d.data[key]) == len(d.data[data_keys[0]]) for key in data_keys]))
+        assert(all([len(d.data[key]) == len(d.data[data_keys[0]]) for key in data_keys if key in d.data]))
         print(f"{d.name} has {len(d.data[data_keys[0]])} entries") if verbose else None
         
         # Try to find a valid timestamp field

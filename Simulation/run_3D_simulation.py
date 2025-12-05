@@ -115,10 +115,45 @@ def main():
     #                     startTime=8)
         ulgData = load_ulg("/home/valentin/RL/TESTFLIGHTS/sininput.ulg", 
                         fields_to_extract=[['vehicle_local_position','vx'],['vehicle_local_position','vy'],
-                                        ['vehicle_local_position_setpoint','vx'],['vehicle_local_position_setpoint','vy']],
-                        startTime=264)
+                                        ['vehicle_local_position_setpoint','vx'],['vehicle_local_position_setpoint','vy'],
+                                        ['vehicle_attitude','roll'],['vehicle_attitude','pitch'],['vehicle_attitude','yaw'],
+                                        ['vehicle_attitude_setpoint','roll_body'],['vehicle_attitude_setpoint','pitch_body'],['vehicle_attitude_setpoint','yaw_body'],
+                                        ['vehicle_rates_setpoint','pitch'],['vehicle_rates_setpoint','roll'],['vehicle_rates_setpoint','yaw'],
+                                        ['vehicle_angular_velocity','xyz[0]'],['vehicle_angular_velocity','xyz[1]'],['vehicle_angular_velocity','xyz[2]']
+                                        ],
+                        startTime=264, verbose=True)
     else:
         ulgData = None
+
+    # plt.figure(1)
+    # plt.subplot(3, 1, 1)
+    # plt.plot(ulgData['vehicle_attitude_setpoint_roll_body']['timestamp'], ulgData['vehicle_attitude_setpoint_roll_body']['data'])
+    # plt.plot(ulgData['vehicle_attitude_roll']['timestamp'], ulgData['vehicle_attitude_roll']['data'])
+    # plt.title('Roll');  plt.xlabel('Time (s)'); plt.ylabel('Angle (rad)'); plt.grid(True)
+    # plt.subplot(3, 1, 2)
+    # plt.plot(ulgData['vehicle_attitude_setpoint_pitch_body']['timestamp'], ulgData['vehicle_attitude_setpoint_pitch_body']['data'])
+    # plt.plot(ulgData['vehicle_attitude_pitch']['timestamp'], ulgData['vehicle_attitude_pitch']['data'])
+    # plt.title('Pitch'); plt.xlabel('Time (s)'); plt.ylabel('Angle (rad)'); plt.grid(True)
+    # plt.subplot(3, 1, 3)
+    # plt.plot(ulgData['vehicle_attitude_setpoint_yaw_body']['timestamp'], ulgData['vehicle_attitude_setpoint_yaw_body']['data'])
+    # plt.plot(ulgData['vehicle_attitude_yaw']['timestamp'], ulgData['vehicle_attitude_yaw']['data'])
+    # plt.title('Yaw'); plt.xlabel('Time (s)'); plt.ylabel('Angle (rad)'); plt.grid(True)
+
+
+    # plt.figure(2)
+    # plt.subplot(3, 1, 1)
+    # plt.plot(ulgData['vehicle_rates_setpoint_roll']['timestamp'], ulgData['vehicle_rates_setpoint_roll']['data'])
+    # plt.plot(ulgData['vehicle_angular_velocity_xyz[0]']['timestamp'], ulgData['vehicle_angular_velocity_xyz[0]']['data'])
+    # plt.title('Roll'); plt.xlabel('Time (s)'); plt.ylabel('Angle (rad)'); plt.grid(True)
+    # plt.subplot(3, 1, 2)
+    # plt.plot(ulgData['vehicle_rates_setpoint_pitch']['timestamp'], ulgData['vehicle_rates_setpoint_pitch']['data'])
+    # plt.plot(ulgData['vehicle_angular_velocity_xyz[1]']['timestamp'], ulgData['vehicle_angular_velocity_xyz[1]']['data'])
+    # plt.title('Pitch'); plt.xlabel('Time (s)'); plt.ylabel('Angle (rad)'); plt.grid(True)
+    # plt.subplot(3, 1, 3)
+    # plt.plot(ulgData['vehicle_rates_setpoint_yaw']['timestamp'], ulgData['vehicle_rates_setpoint_yaw']['data'])
+    # plt.plot(ulgData['vehicle_angular_velocity_xyz[2]']['timestamp'], ulgData['vehicle_angular_velocity_xyz[2]']['data'])
+    # plt.title('Yaw'); plt.xlabel('Time (s)'); plt.ylabel('Angle (rad)'); plt.grid(True)
+    # plt.show()
 
     # Simulation Setup
     # --------------------------- 
