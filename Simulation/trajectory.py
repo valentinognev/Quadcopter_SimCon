@@ -23,7 +23,7 @@ from ctrl import ControlType
 
 class Trajectory:
 
-    def __init__(self, quad, ctrlType, trajSelect, ulgData=None):
+    def __init__(self, quad, ctrlType: ControlType, trajSelect, ulgData=None):
 
         self.ulgData = ulgData
         self.maxThr = quad.params["maxThr"]  # Maximum total thrust [Nt] for converting percentage to physical units
@@ -91,7 +91,7 @@ class Trajectory:
         self.sDes = np.hstack((self.desPos, self.desVel, self.desAcc, self.desThr, self.desEul, self.desPQR, self.desYawRate)).astype(float)
 
 
-    def desiredState(self, t, Ts, quad):
+    def desiredState(self, t, Ts, quad, desired=None):
         
         self.desPos = np.zeros(3)    # Desired position (x, y, z)
         self.desVel = np.zeros(3)    # Desired velocity (xdot, ydot, zdot)
@@ -303,6 +303,18 @@ class Trajectory:
         elif (self.ctrlType == ControlType.XY_VEL_Z_POS):
             if (self.xyzType == 1):
                 self.sDes = testVelControl(t, ControlType.XY_VEL_Z_POS, self.ulgData)
+            elif (self.xyzType == 0 and desired is not None):
+                # Trajectory for Desired States 
+                # ---------------------------
+                desPos = np.array([desired['pos'][0], desired['pos'][1], desired['pos'][2]])    # Desired position (x, y, z)
+                desVel = np.array([desired['vel'][0], desired['vel'][1], 0.0])    # Desired velocity (xdot, ydot, zdot)
+                desAcc = np.zeros(3)    # Desired acceleration (xdotdot, ydotdot, zdotdot)
+                desThr = np.zeros(3)    # Desired thrust in N-E-D directions (or E-N-U, if selected)
+                desEul = np.zeros(3)    # Desired orientation in the world frame (phi, theta, psi)
+                desPQR = np.zeros(3)    # Desired angular velocity in the body frame (p, q, r)
+                desYawRate = desired['yaw_rate']         # Desired yaw speed
+                self.sDes = np.hstack((desPos, desVel, desAcc, desThr, desEul, desPQR, desYawRate)).astype(float)
+                pass   
         
         elif (self.ctrlType == ControlType.ATT):
             # Attitude target mode: angles + thrust, rates calculated by attitude_control

@@ -9,7 +9,10 @@ Please feel free to use and modify this, but keep the above information. Thanks!
 import numpy as np
 from numpy import sin, cos, tan, pi, sign
 from scipy.integrate import ode
-
+import sys
+import os
+simulation_path = os.path.join(os.path.dirname(__file__), 'Quadcopter_SimCon', 'Simulation')
+sys.path.append(simulation_path)
 from quadFiles.initQuad import sys_params, init_cmd, init_state
 import utils
 import config
