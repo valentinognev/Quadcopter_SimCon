@@ -19,12 +19,14 @@ from numpy import pi
 from numpy.linalg import norm
 from waypoints import makeWaypoints
 import config
+from ctrl import ControlType
 
 class Trajectory:
 
     def __init__(self, quad, ctrlType, trajSelect, ulgData=None):
 
         self.ulgData = ulgData
+        self.maxThr = quad.params["maxThr"]  # Maximum total thrust [Nt] for converting percentage to physical units
         
         self.ctrlType = ctrlType
         self.xyzType = trajSelect[0]
@@ -39,7 +41,7 @@ class Trajectory:
 
         self.end_reached = 0
 
-        if (self.ctrlType == "xyz_pos"):
+        if (self.ctrlType == ControlType.XYZ_POS):
             self.T_segment = np.diff(self.t_wps)
 
             if (self.averVel == 1):
@@ -294,15 +296,24 @@ class Trajectory:
             self.current_heading = self.desEul[2]
             pass                
 
-        if (self.ctrlType == "xyz_vel"):
+        if (self.ctrlType == ControlType.XYZ_VEL):
             if (self.xyzType == 1):
-                self.sDes = testVelControl(t)
+                self.sDes = testVelControl(t, ControlType.XYZ_VEL, self.ulgData)
 
-        elif (self.ctrlType == "xy_vel_z_pos"):
+        elif (self.ctrlType == ControlType.XY_VEL_Z_POS):
             if (self.xyzType == 1):
-                self.sDes = testVelControl(t, self.ulgData)
+                self.sDes = testVelControl(t, ControlType.XY_VEL_Z_POS, self.ulgData)
         
-        elif (self.ctrlType == "xyz_pos"):
+        elif (self.ctrlType == ControlType.ATT):
+            # Attitude target mode: angles + thrust, rates calculated by attitude_control
+            if (self.xyzType == 1):
+                self.sDes = testAttControl(t, self.ulgData, self.maxThr)
+        elif (self.ctrlType == ControlType.ATT_RATE):
+            # Attitude rate target mode: rates + thrust, bypasses attitude_control
+            if (self.xyzType == 1):
+                self.sDes = testAttRateControl(t, self.ulgData, self.maxThr)
+        
+        elif (self.ctrlType == ControlType.XYZ_POS):
             # Hover at [0, 0, 0]
             if (self.xyzType == 0):
                 pass 
@@ -614,7 +625,7 @@ def testXYZposition(t):
     return sDes
 
 
-def testVelControl(t, ulgdata=None):
+def testVelControl(t, ctlType: ControlType, ulgdata=None):
     desPos = np.array([0., 0., 0.])
     desVel = np.array([0., 0., 0.])
     desAcc = np.array([0., 0., 0.])
@@ -623,8 +634,14 @@ def testVelControl(t, ulgdata=None):
     desPQR = np.array([0., 0., 0.])
     desYawRate = 0.
 
-    # Interpolate desired vx and vy from ulgData setpoint fields if available
-    if ulgdata is not None:
+    # Interpolate desired vx, vy and vz from ulgData setpoint fields if available
+    if ulgdata is None:
+        # Fallback to hardcoded values if ulgdata not provided
+        if t >= 1 and t < 4:
+            desVel = np.array([3, 2, 0])
+        elif t >= 4:
+            desVel = np.array([3, -1, 0])
+    else:
         # Interpolate vx
         vx_data = ulgdata['vehicle_local_position_setpoint_vx']
         timestamps = vx_data['timestamp']
@@ -636,13 +653,136 @@ def testVelControl(t, ulgdata=None):
         timestamps = vy_data['timestamp']
         values = vy_data['data']
         desVel[1] = np.interp(t, timestamps, values, left=0.0, right=0.0)
-        pass
-    else:
-        # Fallback to hardcoded values if ulgdata not provided
-        if t >= 1 and t < 4:
-            desVel = np.array([3, 2, 0])
-        elif t >= 4:
-            desVel = np.array([3, -1, 0])
+        
+        # Interpolate vz
+        if ctlType == ControlType.XYZ_VEL:
+            vz_data = ulgdata['vehicle_local_position_setpoint_vz']
+            timestamps = vz_data['timestamp']
+            values = vz_data['data']
+            desVel[2] = np.interp(t, timestamps, values, left=0.0, right=0.0)
+     
+    sDes = np.hstack((desPos, desVel, desAcc, desThr, desEul, desPQR, desYawRate)).astype(float)
+    
+    return sDes
+
+
+def testAttControl(t, ulgdata=None, maxThr=None):
+    """
+    Attitude target mode: Inject attitude setpoints (roll, pitch, yaw) and thrust setpoints (x, y, z) from ulg data.
+    Rate setpoints are calculated by the attitude_control function.
+    This function interpolates the setpoints at time t and returns a desired state vector.
+    
+    Args:
+        t: Current time
+        ulgdata: Dictionary with ulg data containing setpoints
+        maxThr: Maximum total thrust in Newtons (for converting percentage to physical units)
+    """
+    desPos = np.array([0., 0., 0.])
+    desVel = np.array([0., 0., 0.])
+    desAcc = np.array([0., 0., 0.])
+    desThr = np.array([0., 0., 0.])
+    desEul = np.array([0., 0., 0.])
+    desPQR = np.array([0., 0., 0.])  # Will be calculated by attitude_control
+    desYawRate = 0.
+
+    # Interpolate angle and thrust setpoints from ulgData if available
+    if ulgdata is not None:
+        # Interpolate roll setpoint
+        roll_data = ulgdata['vehicle_attitude_setpoint_roll_body']
+        timestamps = roll_data['timestamp']
+        values = roll_data['data']
+        desEul[0] = np.interp(t, timestamps, values, left=0.0, right=0.0)
+    
+        # Interpolate pitch setpoint
+        pitch_data = ulgdata['vehicle_attitude_setpoint_pitch_body']
+        timestamps = pitch_data['timestamp']
+        values = pitch_data['data']
+        desEul[1] = np.interp(t, timestamps, values, left=0.0, right=0.0)
+        
+        # Interpolate yaw setpoint
+        yaw_data = ulgdata['vehicle_attitude_setpoint_yaw_body']
+        timestamps = yaw_data['timestamp']
+        values = yaw_data['data']
+        desEul[2] = np.interp(t, timestamps, values, left=0.0, right=0.0)
+    
+        # Interpolate thrust setpoint (x, y, z components) - convert from percentage to Newtons
+        thrust_x_data = ulgdata['vehicle_thrust_setpoint_xyz[0]']
+        timestamps = thrust_x_data['timestamp']
+        values = thrust_x_data['data']
+        # Convert from percentage (0-1) to Newtons
+        desThr[0] = np.interp(t, timestamps, values, left=0.0, right=0.0) * maxThr
+        
+        thrust_y_data = ulgdata['vehicle_thrust_setpoint_xyz[1]']
+        timestamps = thrust_y_data['timestamp']
+        values = thrust_y_data['data']
+        desThr[1] = np.interp(t, timestamps, values, left=0.0, right=0.0) * maxThr
+    
+        thrust_z_data = ulgdata['vehicle_thrust_setpoint_xyz[2]']
+        timestamps = thrust_z_data['timestamp']
+        values = thrust_z_data['data']
+        desThr[2] = np.interp(t, timestamps, values, left=0.0, right=0.0) * maxThr
+     
+    sDes = np.hstack((desPos, desVel, desAcc, desThr, desEul, desPQR, desYawRate)).astype(float)
+    
+    return sDes
+
+
+def testAttRateControl(t, ulgdata=None, maxThr=None):
+    """
+    Attitude rate target mode: Inject rate setpoints (p, q, r) and thrust setpoints (x, y, z) from ulg data.
+    This bypasses attitude_control and directly injects rates to rate_control.
+    This function interpolates the setpoints at time t and returns a desired state vector.
+    
+    Args:
+        t: Current time
+        ulgdata: Dictionary with ulg data containing setpoints
+        maxThr: Maximum total thrust in Newtons (for converting percentage to physical units)
+    """
+    desPos = np.array([0., 0., 0.])
+    desVel = np.array([0., 0., 0.])
+    desAcc = np.array([0., 0., 0.])
+    desThr = np.array([0., 0., 0.])
+    desEul = np.array([0., 0., 0.])  # Not used in rate target mode
+    desPQR = np.array([0., 0., 0.])
+    desYawRate = 0.
+
+    # Interpolate rate and thrust setpoints from ulgData if available
+    if ulgdata is not None:
+        # Interpolate roll rate setpoint
+        roll_rate_data = ulgdata['vehicle_rates_setpoint_roll']
+        timestamps = roll_rate_data['timestamp']
+        values = roll_rate_data['data']
+        desPQR[0] = np.interp(t, timestamps, values, left=0.0, right=0.0)
+        
+        # Interpolate pitch rate setpoint
+        pitch_rate_data = ulgdata['vehicle_rates_setpoint_pitch']
+        timestamps = pitch_rate_data['timestamp']
+        values = pitch_rate_data['data']
+        desPQR[1] = np.interp(t, timestamps, values, left=0.0, right=0.0)
+        
+        # Interpolate yaw rate setpoint
+        yaw_rate_data = ulgdata['vehicle_rates_setpoint_yaw']
+        timestamps = yaw_rate_data['timestamp']
+        values = yaw_rate_data['data']
+        desPQR[2] = np.interp(t, timestamps, values, left=0.0, right=0.0)
+        desYawRate = desPQR[2]  # Also set yaw rate feedforward
+        
+        # Interpolate thrust setpoint (x, y, z components) - convert from percentage to Newtons
+        thrust_x_data = ulgdata['vehicle_thrust_setpoint_xyz[0]']
+        timestamps = thrust_x_data['timestamp']
+        values = thrust_x_data['data']
+        # Convert from percentage (0-1) to Newtons
+        desThr[0] = np.interp(t, timestamps, values, left=0.0, right=0.0) * maxThr
+        
+        thrust_y_data = ulgdata['vehicle_thrust_setpoint_xyz[1]']
+        timestamps = thrust_y_data['timestamp']
+        values = thrust_y_data['data']
+        desThr[1] = np.interp(t, timestamps, values, left=0.0, right=0.0) * maxThr
+    
+        thrust_z_data = ulgdata['vehicle_thrust_setpoint_xyz[2]']
+        timestamps = thrust_z_data['timestamp']
+        values = thrust_z_data['data']
+        desThr[2] = np.interp(t, timestamps, values, left=0.0, right=0.0) * maxThr
      
     sDes = np.hstack((desPos, desVel, desAcc, desThr, desEul, desPQR, desYawRate)).astype(float)
     

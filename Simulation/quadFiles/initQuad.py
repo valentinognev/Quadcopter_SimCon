@@ -20,6 +20,7 @@ def sys_params():
     dxm = 0.054      # arm length (m)
     dym = 0.054      # arm length (m)
     dzm = 0.024      # motor height (m)
+    Ifactor = 1.5
     IB  = np.array([[0.00084, 0,      0     ],
                     [0,      0.00135, 0     ],
                     [0,      0,      0.002]]) # Inertial tensor (kg*m^2)

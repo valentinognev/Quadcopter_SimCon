@@ -24,7 +24,7 @@ def fullprint(*args, **kwargs):
     np.set_printoptions(opt)
 
 
-def makeFigures(params, time, pos_all, vel_all, quat_all, omega_all, euler_all, commands, wMotor_all, thrust, torque, sDes_traj, sDes_calc):
+def makeFigures(params, time, pos_all, vel_all, quat_all, omega_all, euler_all, commands, wMotor_all, thrust, torque, sDes_traj, sDes_calc, ulgData=None):
     x    = pos_all[:,0]
     y    = pos_all[:,1]
     z    = pos_all[:,2]
@@ -75,6 +75,16 @@ def makeFigures(params, time, pos_all, vel_all, quat_all, omega_all, euler_all, 
     Ay_tr = sDes_traj[:,7]
     Az_tr = sDes_traj[:,8]
     yaw_tr = sDes_traj[:,14]*rad2deg
+    
+    # Extract Euler angle setpoints from trajectory (columns 12:15 are desEul)
+    phi_sp_traj = sDes_traj[:,12]*rad2deg
+    theta_sp_traj = sDes_traj[:,13]*rad2deg
+    psi_sp_traj = sDes_traj[:,14]*rad2deg
+    
+    # Extract angular rate setpoints from trajectory (columns 15:18 are desPQR)
+    p_sp_traj = sDes_traj[:,15]*rad2deg
+    q_sp_traj = sDes_traj[:,16]*rad2deg
+    r_sp_traj = sDes_traj[:,17]*rad2deg
 
     uM1 = commands[:,0]*rads2rpm
     uM2 = commands[:,1]*rads2rpm
@@ -97,23 +107,82 @@ def makeFigures(params, time, pos_all, vel_all, quat_all, omega_all, euler_all, 
     plt.show()
 
     plt.figure()
-    plt.plot(time, x, time, y, time, z)
-    plt.plot(time, x_sp, '--', time, y_sp, '--', time, z_sp, '--')
+    plt.suptitle('Position: Simulated vs Setpoint')
+    
+    # X position
+    ax1 = plt.subplot(3, 1, 1)
+    plt.plot(time, x, label='x (simulated)', linewidth=2)
+    plt.plot(time, x_sp, '--', label='x (setpoint)', linewidth=2)
     plt.grid(True)
-    plt.legend(['x','y','z','x_sp','y_sp','z_sp'])
+    plt.legend()
     plt.xlabel('Time (s)')
-    plt.ylabel('Position (m)')
+    plt.ylabel('X Position (m)')
+    
+    # Y position
+    ax2 = plt.subplot(3, 1, 2, sharex=ax1)
+    plt.plot(time, y, label='y (simulated)', linewidth=2)
+    plt.plot(time, y_sp, '--', label='y (setpoint)', linewidth=2)
+    plt.grid(True)
+    plt.legend()
+    plt.xlabel('Time (s)')
+    plt.ylabel('Y Position (m)')
+    
+    # Z position
+    ax3 = plt.subplot(3, 1, 3, sharex=ax1)
+    plt.plot(time, z, label='z (simulated)', linewidth=2)
+    plt.plot(time, z_sp, '--', label='z (setpoint)', linewidth=2)
+    plt.grid(True)
+    plt.legend()
+    plt.xlabel('Time (s)')
+    plt.ylabel('Z Position (m)')
     plt.draw()
 
 
 
     plt.figure()
-    plt.plot(time, xdot, time, ydot, time, zdot)
-    plt.plot(time, Vx_sp, '--', time, Vy_sp, '--', time, Vz_sp, '--')
+    plt.suptitle('Velocity: Simulated vs Setpoint')
+    
+    # Vx velocity
+    ax1 = plt.subplot(3, 1, 1)
+    plt.plot(time, xdot, label='Vx (simulated)', linewidth=2)
+    plt.plot(time, Vx_sp, '--', label='Vx (setpoint)', linewidth=2)
+    # Add ulg data if available
+    if ulgData is not None:
+        if 'vehicle_local_position_vx' in ulgData:
+            vx_data = ulgData['vehicle_local_position_vx']
+            plt.plot(vx_data['timestamp'], vx_data['data'], ':', label='Vx (ulg)', linewidth=2, alpha=0.7)
     plt.grid(True)
-    plt.legend(['Vx','Vy','Vz','Vx_sp','Vy_sp','Vz_sp'])
+    plt.legend()
     plt.xlabel('Time (s)')
-    plt.ylabel('Velocity (m/s)')
+    plt.ylabel('Vx (m/s)')
+    
+    # Vy velocity
+    ax2 = plt.subplot(3, 1, 2, sharex=ax1)
+    plt.plot(time, ydot, label='Vy (simulated)', linewidth=2)
+    plt.plot(time, Vy_sp, '--', label='Vy (setpoint)', linewidth=2)
+    # Add ulg data if available
+    if ulgData is not None:
+        if 'vehicle_local_position_vy' in ulgData:
+            vy_data = ulgData['vehicle_local_position_vy']
+            plt.plot(vy_data['timestamp'], vy_data['data'], ':', label='Vy (ulg)', linewidth=2, alpha=0.7)
+    plt.grid(True)
+    plt.legend()
+    plt.xlabel('Time (s)')
+    plt.ylabel('Vy (m/s)')
+    
+    # Vz velocity
+    ax3 = plt.subplot(3, 1, 3, sharex=ax1)
+    plt.plot(time, zdot, label='Vz (simulated)', linewidth=2)
+    plt.plot(time, Vz_sp, '--', label='Vz (setpoint)', linewidth=2)
+    # Add ulg data if available
+    if ulgData is not None:
+        if 'vehicle_local_position_vz' in ulgData:
+            vz_data = ulgData['vehicle_local_position_vz']
+            plt.plot(vz_data['timestamp'], vz_data['data'], ':', label='Vz (ulg)', linewidth=2, alpha=0.7)
+    plt.grid(True)
+    plt.legend()
+    plt.xlabel('Time (s)')
+    plt.ylabel('Vz (m/s)')
     plt.draw()
 
     plt.figure()
@@ -124,23 +193,93 @@ def makeFigures(params, time, pos_all, vel_all, quat_all, omega_all, euler_all, 
     plt.ylabel('Desired Thrust (N)')
     plt.draw()
 
+
+    # attitude plot
     plt.figure()
-    plt.plot(time, phi, time, theta, time, psi)
-    plt.plot(time, phiDes, '--', time, thetaDes, '--', time, psiDes, '--')
-    plt.plot(time, yaw_tr, '-.')
+    plt.suptitle('Euler Angles: Simulated vs Setpoint')
+    
+    # Roll
+    ax1 = plt.subplot(3, 1, 1)
+    plt.plot(time, phi, label='Roll (simulated)', linewidth=2)
+    plt.plot(time, phiDes, '--', label='Roll (setpoint calc)', linewidth=2)
+    plt.plot(time, phi_sp_traj, ':', label='Roll (setpoint traj)', linewidth=2)
+    if ulgData is not None and 'vehicle_attitude_roll' in ulgData:
+        roll_ulg = ulgData['vehicle_attitude_roll']
+        plt.plot(roll_ulg['timestamp'], roll_ulg['data'] * rad2deg, '-.', label='Roll (ulg)', linewidth=2, alpha=0.7)
     plt.grid(True)
-    plt.legend(['roll','pitch','yaw','roll_sp','pitch_sp','yaw_sp','yaw_tr'])
+    plt.legend()
     plt.xlabel('Time (s)')
-    plt.ylabel('Euler Angle (°)')
+    plt.ylabel('Roll (°)')
+    
+    # Pitch
+    ax2 = plt.subplot(3, 1, 2, sharex=ax1)
+    plt.plot(time, theta, label='Pitch (simulated)', linewidth=2)
+    plt.plot(time, thetaDes, '--', label='Pitch (setpoint calc)', linewidth=2)
+    plt.plot(time, theta_sp_traj, ':', label='Pitch (setpoint traj)', linewidth=2)
+    if ulgData is not None and 'vehicle_attitude_pitch' in ulgData:
+        pitch_ulg = ulgData['vehicle_attitude_pitch']
+        plt.plot(pitch_ulg['timestamp'], pitch_ulg['data'] * rad2deg, '-.', label='Pitch (ulg)', linewidth=2, alpha=0.7)
+    plt.grid(True)
+    plt.legend()
+    plt.xlabel('Time (s)')
+    plt.ylabel('Pitch (°)')
+    
+    # Yaw
+    ax3 = plt.subplot(3, 1, 3, sharex=ax1)
+    plt.plot(time, psi, label='Yaw (simulated)', linewidth=2)
+    plt.plot(time, psiDes, '--', label='Yaw (setpoint calc)', linewidth=2)
+    plt.plot(time, psi_sp_traj, ':', label='Yaw (setpoint traj)', linewidth=2)
+    if ulgData is not None and 'vehicle_attitude_yaw' in ulgData:
+        yaw_ulg = ulgData['vehicle_attitude_yaw']
+        plt.plot(yaw_ulg['timestamp'], yaw_ulg['data'] * rad2deg, '-.', label='Yaw (ulg)', linewidth=2, alpha=0.7)
+    plt.grid(True)
+    plt.legend()
+    plt.xlabel('Time (s)')
+    plt.ylabel('Yaw (°)')
     plt.draw()
     
+    # angular rates plot
     plt.figure()
-    plt.plot(time, p, time, q, time, r)
-    plt.plot(time, pDes, '--', time, qDes, '--', time, rDes, '--')
+    plt.suptitle('Angular Rates: Simulated vs Setpoint')
+    
+    # Roll rate (p)
+    ax1 = plt.subplot(3, 1, 1)
+    plt.plot(time, p, label='Roll Rate (p) - simulated', linewidth=2)
+    plt.plot(time, pDes, '--', label='Roll Rate (p) - setpoint calc', linewidth=2)
+    plt.plot(time, p_sp_traj, ':', label='Roll Rate (p) - setpoint traj', linewidth=2)
+    if ulgData is not None and 'vehicle_angular_velocity_xyz[0]' in ulgData:
+        p_ulg = ulgData['vehicle_angular_velocity_xyz[0]']
+        plt.plot(p_ulg['timestamp'], p_ulg['data'] * rad2deg, '-.', label='Roll Rate (p) - ulg', linewidth=2, alpha=0.7)
     plt.grid(True)
-    plt.legend(['p','q','r','p_sp','q_sp','r_sp'])
+    plt.legend()
     plt.xlabel('Time (s)')
-    plt.ylabel('Angular Velocity (°/s)')
+    plt.ylabel('Roll Rate (°/s)')
+    
+    # Pitch rate (q)
+    ax2 = plt.subplot(3, 1, 2, sharex=ax1)
+    plt.plot(time, q, label='Pitch Rate (q) - simulated', linewidth=2)
+    plt.plot(time, qDes, '--', label='Pitch Rate (q) - setpoint calc', linewidth=2)
+    plt.plot(time, q_sp_traj, ':', label='Pitch Rate (q) - setpoint traj', linewidth=2)
+    if ulgData is not None and 'vehicle_angular_velocity_xyz[1]' in ulgData:
+        q_ulg = ulgData['vehicle_angular_velocity_xyz[1]']
+        plt.plot(q_ulg['timestamp'], q_ulg['data'] * rad2deg, '-.', label='Pitch Rate (q) - ulg', linewidth=2, alpha=0.7)
+    plt.grid(True)
+    plt.legend()
+    plt.xlabel('Time (s)')
+    plt.ylabel('Pitch Rate (°/s)')
+    
+    # Yaw rate (r)
+    ax3 = plt.subplot(3, 1, 3, sharex=ax1)
+    plt.plot(time, r, label='Yaw Rate (r) - simulated', linewidth=2)
+    plt.plot(time, rDes, '--', label='Yaw Rate (r) - setpoint calc', linewidth=2)
+    plt.plot(time, r_sp_traj, ':', label='Yaw Rate (r) - setpoint traj', linewidth=2)
+    if ulgData is not None and 'vehicle_angular_velocity_xyz[2]' in ulgData:
+        r_ulg = ulgData['vehicle_angular_velocity_xyz[2]']
+        plt.plot(r_ulg['timestamp'], r_ulg['data'] * rad2deg, '-.', label='Yaw Rate (r) - ulg', linewidth=2, alpha=0.7)
+    plt.grid(True)
+    plt.legend()
+    plt.xlabel('Time (s)')
+    plt.ylabel('Yaw Rate (°/s)')
     plt.draw()
 
     plt.figure()
@@ -153,7 +292,7 @@ def makeFigures(params, time, pos_all, vel_all, quat_all, omega_all, euler_all, 
     plt.draw()
 
     plt.figure()
-    plt.subplot(2,1,1)
+    ax1 = plt.subplot(2,1,1)
     plt.plot(time, thrust[:,0], time, thrust[:,1], time, thrust[:,2], time, thrust[:,3])
     plt.grid(True)
     plt.legend(['thr1','thr2','thr3','thr4'], loc='upper right')
@@ -161,7 +300,7 @@ def makeFigures(params, time, pos_all, vel_all, quat_all, omega_all, euler_all, 
     plt.ylabel('Rotor Thrust (N)')
     plt.draw()
 
-    plt.subplot(2,1,2)
+    ax2 = plt.subplot(2,1,2, sharex=ax1)
     plt.plot(time, torque[:,0], time, torque[:,1], time, torque[:,2], time, torque[:,3])
     plt.grid(True)
     plt.legend(['tor1','tor2','tor3','tor4'], loc='upper right')
@@ -170,7 +309,7 @@ def makeFigures(params, time, pos_all, vel_all, quat_all, omega_all, euler_all, 
     plt.draw()
 
     plt.figure()
-    plt.subplot(3,1,1)
+    ax1 = plt.subplot(3,1,1)
     plt.title('Trajectory Setpoints')
     plt.plot(time, x_tr, time, y_tr, time, z_tr)
     plt.grid(True)
@@ -178,14 +317,14 @@ def makeFigures(params, time, pos_all, vel_all, quat_all, omega_all, euler_all, 
     plt.xlabel('Time (s)')
     plt.ylabel('Position (m)')
 
-    plt.subplot(3,1,2)
+    ax2 = plt.subplot(3,1,2, sharex=ax1)
     plt.plot(time, Vx_tr, time, Vy_tr, time, Vz_tr)
     plt.grid(True)
     plt.legend(['Vx','Vy','Vz'], loc='upper right')
     plt.xlabel('Time (s)')
     plt.ylabel('Velocity (m/s)')
    
-    plt.subplot(3,1,3)
+    ax3 = plt.subplot(3,1,3, sharex=ax1)
     plt.plot(time, Ax_tr, time, Ay_tr, time, Az_tr)
     plt.grid(True)
     plt.legend(['Ax','Ay','Az'], loc='upper right')
@@ -199,4 +338,131 @@ def makeFigures(params, time, pos_all, vel_all, quat_all, omega_all, euler_all, 
     plt.legend(['Pos x error','Pos y error','Pos z error'])
     plt.xlabel('Time (s)')
     plt.ylabel('Position Error (m)')
+    plt.draw()
+
+
+def plotComparisonWithUlg(time, euler_all, omega_all, ulgData=None):
+    """
+    Plot comparison between simulated angles/rates and recorded values from ulg file.
+    
+    Args:
+        time: Simulation time array
+        euler_all: Simulated Euler angles [N, 3] (roll, pitch, yaw) in radians
+        omega_all: Simulated angular velocities [N, 3] (p, q, r) in rad/s
+        ulgData: Dictionary with ulg data containing recorded angles and rates
+    """
+    if ulgData is None:
+        return
+    
+    phi = euler_all[:, 0] * rad2deg
+    theta = euler_all[:, 1] * rad2deg
+    psi = euler_all[:, 2] * rad2deg
+    p = omega_all[:, 0] * rad2deg
+    q = omega_all[:, 1] * rad2deg
+    r = omega_all[:, 2] * rad2deg
+    
+    # Plot angle comparison
+    plt.figure()
+    plt.suptitle('Angle Comparison: Simulated vs Recorded (ULG)')
+    
+    # Roll
+    ax1 = plt.subplot(3, 1, 1)
+    plt.plot(time, phi, label='Simulated Roll', linewidth=2)
+    if 'vehicle_attitude_roll' in ulgData:
+        roll_data = ulgData['vehicle_attitude_roll']
+        plt.plot(roll_data['timestamp'], roll_data['data'] * rad2deg, '--', 
+                label='Recorded Roll (ULG)', linewidth=2)
+    if 'vehicle_attitude_setpoint_roll_body' in ulgData:
+        roll_sp_data = ulgData['vehicle_attitude_setpoint_roll_body']
+        plt.plot(roll_sp_data['timestamp'], roll_sp_data['data'] * rad2deg, ':', 
+                label='Setpoint Roll (ULG)', linewidth=1.5, alpha=0.7)
+    plt.grid(True)
+    plt.legend()
+    plt.xlabel('Time (s)')
+    plt.ylabel('Roll (°)')
+    
+    # Pitch
+    ax2 = plt.subplot(3, 1, 2, sharex=ax1)
+    plt.plot(time, theta, label='Simulated Pitch', linewidth=2)
+    if 'vehicle_attitude_pitch' in ulgData:
+        pitch_data = ulgData['vehicle_attitude_pitch']
+        plt.plot(pitch_data['timestamp'], pitch_data['data'] * rad2deg, '--', 
+                label='Recorded Pitch (ULG)', linewidth=2)
+    if 'vehicle_attitude_setpoint_pitch_body' in ulgData:
+        pitch_sp_data = ulgData['vehicle_attitude_setpoint_pitch_body']
+        plt.plot(pitch_sp_data['timestamp'], pitch_sp_data['data'] * rad2deg, ':', 
+                label='Setpoint Pitch (ULG)', linewidth=1.5, alpha=0.7)
+    plt.grid(True)
+    plt.legend()
+    plt.xlabel('Time (s)')
+    plt.ylabel('Pitch (°)')
+    
+    # Yaw
+    ax3 = plt.subplot(3, 1, 3, sharex=ax1)
+    plt.plot(time, psi, label='Simulated Yaw', linewidth=2)
+    if 'vehicle_attitude_yaw' in ulgData:
+        yaw_data = ulgData['vehicle_attitude_yaw']
+        plt.plot(yaw_data['timestamp'], yaw_data['data'] * rad2deg, '--', 
+                label='Recorded Yaw (ULG)', linewidth=2)
+    if 'vehicle_attitude_setpoint_yaw_body' in ulgData:
+        yaw_sp_data = ulgData['vehicle_attitude_setpoint_yaw_body']
+        plt.plot(yaw_sp_data['timestamp'], yaw_sp_data['data'] * rad2deg, ':', 
+                label='Setpoint Yaw (ULG)', linewidth=1.5, alpha=0.7)
+    plt.grid(True)
+    plt.legend()
+    plt.xlabel('Time (s)')
+    plt.ylabel('Yaw (°)')
+    plt.draw()
+    
+    # Plot rate comparison
+    plt.figure()
+    plt.suptitle('Angular Rate Comparison: Simulated vs Recorded (ULG)')
+    
+    # Roll rate (p)
+    ax1 = plt.subplot(3, 1, 1)
+    plt.plot(time, p, label='Simulated Roll Rate (p)', linewidth=2)
+    if 'vehicle_angular_velocity_xyz[0]' in ulgData:
+        p_data = ulgData['vehicle_angular_velocity_xyz[0]']
+        plt.plot(p_data['timestamp'], p_data['data'] * rad2deg, '--', 
+                label='Recorded Roll Rate (ULG)', linewidth=2)
+    if 'vehicle_rates_setpoint_roll' in ulgData:
+        p_sp_data = ulgData['vehicle_rates_setpoint_roll']
+        plt.plot(p_sp_data['timestamp'], p_sp_data['data'] * rad2deg, ':', 
+                label='Setpoint Roll Rate (ULG)', linewidth=1.5, alpha=0.7)
+    plt.grid(True)
+    plt.legend()
+    plt.xlabel('Time (s)')
+    plt.ylabel('Roll Rate (°/s)')
+    
+    # Pitch rate (q)
+    ax2 = plt.subplot(3, 1, 2, sharex=ax1)
+    plt.plot(time, q, label='Simulated Pitch Rate (q)', linewidth=2)
+    if 'vehicle_angular_velocity_xyz[1]' in ulgData:
+        q_data = ulgData['vehicle_angular_velocity_xyz[1]']
+        plt.plot(q_data['timestamp'], q_data['data'] * rad2deg, '--', 
+                label='Recorded Pitch Rate (ULG)', linewidth=2)
+    if 'vehicle_rates_setpoint_pitch' in ulgData:
+        q_sp_data = ulgData['vehicle_rates_setpoint_pitch']
+        plt.plot(q_sp_data['timestamp'], q_sp_data['data'] * rad2deg, ':', 
+                label='Setpoint Pitch Rate (ULG)', linewidth=1.5, alpha=0.7)
+    plt.grid(True)
+    plt.legend()
+    plt.xlabel('Time (s)')
+    plt.ylabel('Pitch Rate (°/s)')
+    
+    # Yaw rate (r)
+    ax3 = plt.subplot(3, 1, 3, sharex=ax1)
+    plt.plot(time, r, label='Simulated Yaw Rate (r)', linewidth=2)
+    if 'vehicle_angular_velocity_xyz[2]' in ulgData:
+        r_data = ulgData['vehicle_angular_velocity_xyz[2]']
+        plt.plot(r_data['timestamp'], r_data['data'] * rad2deg, '--', 
+                label='Recorded Yaw Rate (ULG)', linewidth=2)
+    if 'vehicle_rates_setpoint_yaw' in ulgData:
+        r_sp_data = ulgData['vehicle_rates_setpoint_yaw']
+        plt.plot(r_sp_data['timestamp'], r_sp_data['data'] * rad2deg, ':', 
+                label='Setpoint Yaw Rate (ULG)', linewidth=1.5, alpha=0.7)
+    plt.grid(True)
+    plt.legend()
+    plt.xlabel('Time (s)')
+    plt.ylabel('Yaw Rate (°/s)')
     plt.draw()

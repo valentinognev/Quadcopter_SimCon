@@ -19,9 +19,19 @@ from numpy.linalg import norm
 import utils
 import config
 from copy import deepcopy
+from enum import Enum
 
 rad2deg = 180.0/pi
 deg2rad = pi/180.0
+
+
+class ControlType(Enum):
+    """Enumeration of available control types."""
+    XYZ_POS = 0      # Position control in x, y, z
+    XY_VEL_Z_POS = 1 # Velocity control in x, y, position control in z
+    XYZ_VEL = 2      # Velocity control in x, y, z
+    ATT = 3          # Attitude target mode: angles + thrust, rates calculated
+    ATT_RATE = 4     # Attitude rate target mode: rates + thrust, bypasses attitude_control
 
 # Set PID Gains and Max Values
 # ---------------------------
@@ -59,7 +69,7 @@ vel_FF_gain = np.array([FFxdot, FFydot, FFzdot])
 vel_FF_dot_gain = np.array([FFdxdot, FFdydot, FFdzdot])
 
 # Attitude P gains
-Pphi = 10
+Pphi = 10*2
 Ptheta = Pphi
 Ppsi = 1.5
 PpsiStrong = 8
@@ -67,8 +77,9 @@ PpsiStrong = 8
 att_P_gain = np.array([Pphi, Ptheta, Ppsi])
 
 # Rate P-D gains
-Pp = 1.5*0.25*2
-Dp = 0.04*0.25*2
+rateFactor = 0.5
+Pp = 0.4*rateFactor
+Dp = 0.005*2*rateFactor
 
 Pq = Pp
 Dq = Dp 
@@ -117,6 +128,9 @@ class Control:
         self.pqr_sp    = np.zeros(3)
         self.yawFF     = np.zeros(3)
         
+        self.rate_sp = np.zeros(3)
+        self.qd = np.zeros(4)
+        
         self.prevVel_sp = np.zeros(3)
     
     def controller(self, traj, quad, sDes, Ts):
@@ -133,14 +147,14 @@ class Control:
         
         # Select Controller
         # ---------------------------
-        if (traj.ctrlType == "xyz_vel"):
+        if (traj.ctrlType == ControlType.XYZ_VEL):
             self.saturateVel()
             self.z_vel_control(quad, Ts)
             self.xy_vel_control(quad, Ts)
             self.thrustToAttitude(quad, Ts)
             self.attitude_control(quad, Ts)
             self.rate_control(quad, Ts)
-        elif (traj.ctrlType == "xy_vel_z_pos"):
+        elif (traj.ctrlType == ControlType.XY_VEL_Z_POS):
             self.z_pos_control(quad, Ts)
             self.saturateVel()
             self.z_vel_control(quad, Ts)
@@ -148,7 +162,50 @@ class Control:
             self.thrustToAttitude(quad, Ts)
             self.attitude_control(quad, Ts)
             self.rate_control(quad, Ts)
-        elif (traj.ctrlType == "xyz_pos"):
+        elif (traj.ctrlType == ControlType.ATT):
+            # Attitude target mode: inject attitude (angles) and thrust setpoints
+            # Rate setpoints are calculated by attitude_control from angle setpoints
+            # Use thrust setpoint from trajectory (interpolated from ulg file if available)
+            # Thrust setpoint from ulg is in body frame, transform to inertial frame using desired attitude
+            # Compute qd_full from Euler angle setpoints (roll, pitch, yaw)
+            # YPRToQuat expects (yaw, pitch, roll) = (psi, theta, phi)
+            # eul_sp is [roll, pitch, yaw] = [phi, theta, psi]
+            self.qd_full = utils.YPRToQuat(self.eul_sp[2], self.eul_sp[1], self.eul_sp[0])
+            # Convert desired quaternion to DCM for thrust transformation
+            dcm_desired = utils.quat2Dcm(self.qd_full)
+            # Transform thrust setpoint from body frame to inertial frame using desired attitude
+            thrust_sp_body = self.thrust_sp.copy()
+            self.thrust_sp[:] = dcm_desired @ thrust_sp_body
+            
+            # Use attitude control to convert angle setpoints to rate setpoints
+            # This computes rate_sp from eul_sp
+            self.attitude_control(quad, Ts)
+            
+            # Use rate control with the computed rate setpoints
+            self.rate_control(quad, Ts)
+            
+        elif (traj.ctrlType == ControlType.ATT_RATE):
+            # Attitude rate target mode: inject rate and thrust setpoints directly
+            # Bypasses attitude_control, goes directly to rate_control
+            # Use thrust setpoint from trajectory (interpolated from ulg file if available)
+            # Thrust setpoint from ulg is in body frame, transform to inertial frame using desired attitude
+            # Convert Euler angle setpoints to DCM for thrust transformation
+            # YPRToQuat expects (yaw, pitch, roll) = (psi, theta, phi)
+            # eul_sp is [roll, pitch, yaw] = [phi, theta, psi]
+
+            # Transform thrust setpoint from body frame to inertial frame using current attitude
+            thrust_sp_body = self.thrust_sp.copy()
+            self.thrust_sp[:] = utils.quat2Dcm(quad.quat) @ thrust_sp_body
+            
+            # Set rate setpoint directly from trajectory (interpolated from ulg file)
+            self.rate_sp[:] = self.pqr_sp[:]
+            
+            # Limit rate setpoint
+            self.rate_sp = np.clip(self.rate_sp, -rateMax, rateMax)
+            
+            # Use rate control directly (bypasses attitude_control)
+            self.rate_control(quad, Ts)
+        elif (traj.ctrlType == ControlType.XYZ_POS):
             self.z_pos_control(quad, Ts)
             self.xy_pos_control(quad, Ts)
             self.saturateVel()

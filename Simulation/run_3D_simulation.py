@@ -12,7 +12,7 @@ import time
 import cProfile
 
 from trajectory import Trajectory
-from ctrl import Control
+from ctrl import Control, ControlType
 from quadFiles.quad import Quadcopter
 from utils.windModel import Wind
 import utils
@@ -114,13 +114,13 @@ def main():
     #                                     ['vehicle_local_position_setpoint','vx'],['vehicle_local_position_setpoint','vy']],
     #                     startTime=8)
         ulgData = load_ulg("/home/valentin/RL/TESTFLIGHTS/sininput.ulg", 
-                        fields_to_extract=[['vehicle_local_position','vx'],['vehicle_local_position','vy'],
-                                        ['vehicle_local_position_setpoint','vx'],['vehicle_local_position_setpoint','vy'],
+                        fields_to_extract=[['vehicle_local_position','vx'],['vehicle_local_position','vy'],['vehicle_local_position','vz'],
+                                        ['vehicle_local_position_setpoint','vx'],['vehicle_local_position_setpoint','vy'],['vehicle_local_position_setpoint','vz'],
                                         ['vehicle_attitude','roll'],['vehicle_attitude','pitch'],['vehicle_attitude','yaw'],
                                         ['vehicle_attitude_setpoint','roll_body'],['vehicle_attitude_setpoint','pitch_body'],['vehicle_attitude_setpoint','yaw_body'],
                                         ['vehicle_rates_setpoint','pitch'],['vehicle_rates_setpoint','roll'],['vehicle_rates_setpoint','yaw'],
-                                        ['vehicle_angular_velocity','xyz[0]'],['vehicle_angular_velocity','xyz[1]'],['vehicle_angular_velocity','xyz[2]']
-                                        ],
+                                        ['vehicle_angular_velocity','xyz[0]'],['vehicle_angular_velocity','xyz[1]'],['vehicle_angular_velocity','xyz[2]'],
+                                        ['vehicle_thrust_setpoint','xyz[0]'],['vehicle_thrust_setpoint','xyz[1]'],['vehicle_thrust_setpoint','xyz[2]']],
                         startTime=264, verbose=True)
     else:
         ulgData = None
@@ -164,11 +164,13 @@ def main():
  
     # Choose trajectory settings
     # --------------------------- 
-    ctrlOptions = ["xyz_pos", "xy_vel_z_pos", "xyz_vel"]
     trajSelect = np.zeros(3)
 
-    # Select Control Type             (0: xyz_pos,                  1: xy_vel_z_pos,            2: xyz_vel)
-    ctrlType = ctrlOptions[1] if LOAD_ULG_DATA else ctrlOptions[0]
+    # Select Control Type
+    # For attitude target (angles + thrust, rates calculated): use ControlType.ATT
+    # For attitude rate target (rates + thrust, bypasses attitude_control): use ControlType.ATT_RATE
+    # ControlType: XYZ_POS, XY_VEL_Z_POS, XYZ_VEL, ATT, ATT_RATE
+    ctrlType = ControlType.XYZ_VEL if (LOAD_ULG_DATA and ulgData is not None) else ControlType.XYZ_POS
     # Select Position Trajectory Type (0: hover,                    1: pos_waypoint_timed,      2: pos_waypoint_interp,    
     #                                  3: minimum velocity          4: minimum accel,           5: minimum jerk,           6: minimum snap
     #                                  7: minimum accel_stop        8: minimum jerk_stop        9: minimum snap_stop
@@ -233,7 +235,7 @@ def main():
     t = Ti
     i = 1
     while round(t,3) < Tf:
-        if t>6:
+        if t>8:
             pass
         t = quad_sim(t, Ts, quad, ctrl, wind, traj)
         
@@ -261,17 +263,9 @@ def main():
     # ---------------------------
 
     # utils.fullprint(sDes_traj_all[:,3:6])
-    utils.makeFigures(quad.params, t_all, pos_all, vel_all, quat_all, omega_all, euler_all, w_cmd_all, wMotor_all, thr_all, tor_all, sDes_traj_all, sDes_calc_all)
-    
-    if LOAD_ULG_DATA:
-        plt.figure(2)
-        plt.plot(ulgData['vehicle_local_position_vx']['timestamp'], ulgData['vehicle_local_position_vx']['data'])
-        plt.plot(ulgData['vehicle_local_position_vy']['timestamp'], ulgData['vehicle_local_position_vy']['data'])
-        plt.legend(['vx ulg', 'vy ulg'])
-        plt.xlabel('Time (s)')
-        plt.ylabel('Velocity (m/s)')
-        plt.grid(True)
-        
+    ulgData_for_plots = ulgData if (LOAD_ULG_DATA and ulgData is not None) else None
+    utils.makeFigures(quad.params, t_all, pos_all, vel_all, quat_all, omega_all, euler_all, w_cmd_all, wMotor_all, thr_all, tor_all, sDes_traj_all, sDes_calc_all, ulgData_for_plots)
+           
     ani = utils.sameAxisAnimation(t_all, traj.wps, pos_all, quat_all, sDes_traj_all, Ts, quad.params, traj.xyzType, traj.yawType, ifsave)
     # plt.show()
     pass
