@@ -17,13 +17,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 from numpy import pi
 from numpy.linalg import norm
-from waypoints import makeWaypoints
-import config
-from ctrl import ControlType
+from .waypoints import makeWaypoints
+from . import config
+from .ctrl import ControlType
 
 class Trajectory:
 
-    def __init__(self, quad, ctrlType: ControlType, trajSelect, ulgData=None):
+    def __init__(self, quad, ctrlType: ControlType, trajSelect=np.zeros(3), ulgData=None):
 
         self.ulgData = ulgData
         self.maxThr = quad.params["maxThr"]  # Maximum total thrust [Nt] for converting percentage to physical units

@@ -16,8 +16,13 @@ import numpy as np
 from numpy import pi
 from numpy import sin, cos, tan, sqrt
 from numpy.linalg import norm
-import utils
-import config
+
+import sys
+import os
+simulation_path = os.path.join(os.path.dirname(__file__), 'Quadcopter_SimCon', 'Simulation')
+
+from . import utils
+from . import config
 from copy import deepcopy
 from enum import Enum
 
@@ -133,7 +138,7 @@ class Control:
         
         self.prevVel_sp = np.zeros(3)
     
-    def controller(self, traj, quad, sDes, Ts):
+    def controller(self, traj, quad, Ts):
 
         # Desired State (Create a copy, hence the [:])
         # ---------------------------

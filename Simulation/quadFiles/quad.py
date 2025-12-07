@@ -13,9 +13,10 @@ import sys
 import os
 simulation_path = os.path.join(os.path.dirname(__file__), 'Quadcopter_SimCon', 'Simulation')
 sys.path.append(simulation_path)
-from quadFiles.initQuad import sys_params, init_cmd, init_state
-import utils
-import config
+from .initQuad import sys_params, init_cmd, init_state
+from ..utils.windModel import Wind
+from .. import utils
+from .. import config
 
 deg2rad = pi/180.0
 
@@ -217,6 +218,10 @@ class Quadcopter:
         return sdot
 
     def update(self, t, Ts, cmd, wind):
+
+        if wind is None:
+            wind = Wind()
+
 
         prev_vel   = self.vel
         prev_omega = self.omega

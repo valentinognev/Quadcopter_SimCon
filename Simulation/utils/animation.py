@@ -12,8 +12,8 @@ import matplotlib.pyplot as plt
 import mpl_toolkits.mplot3d.axes3d as p3
 from matplotlib import animation
 
-import utils
-import config
+from .. import utils
+from .. import config
 
 numFrames = 8
 
