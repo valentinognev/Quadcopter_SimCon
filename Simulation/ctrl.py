@@ -58,13 +58,14 @@ Pxdot = 1.5
 Dxdot = .25
 Ixdot = 0.1
 FFxdot = 0.0
-FFdxdot = 0.0
+FFdxdot = 0.25
 
-Pydot = Pxdot
-Dydot = Dxdot
-Iydot = Ixdot
-FFydot = FFxdot
-FFdydot = FFdxdot
+yfactor = 0.7
+Pydot = Pxdot*yfactor
+Dydot = Dxdot*yfactor
+Iydot = Ixdot*yfactor
+FFydot = FFxdot*yfactor
+FFdydot = FFdxdot*yfactor
 
 Pzdot = 4.0*6*6
 Dzdot = 0.5
