@@ -7,7 +7,12 @@ Please feel free to use and modify this, but keep the above information. Thanks!
 """
 
 import numpy as np
-from .. import config
+
+# Support both relative and absolute imports
+try:
+    from .. import config
+except ImportError:
+    import config
 
 
 def mixerFM(quad, thr, moment):

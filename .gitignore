@@ -43,3 +43,18 @@ Gifs/Raw/
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# Training directories and outputs #
+####################################
+# TensorBoard event files
+train_dir/**/events.out.tfevents.*
+train_dir/**/.summary/
+
+# Checkpoint files
+train_dir/**/*.pth
+
+# Training logs and configs
+train_dir/**/*.log
+train_dir/**/sf_log.txt
+train_dir/**/git.diff
+train_dir/**/config.json

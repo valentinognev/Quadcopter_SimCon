@@ -17,9 +17,16 @@ import matplotlib.pyplot as plt
 import numpy as np
 from numpy import pi
 from numpy.linalg import norm
-from .waypoints import makeWaypoints
-from . import config
-from .ctrl import ControlType
+
+# Support both relative and absolute imports
+try:
+    from .waypoints import makeWaypoints
+    from . import config
+    from .ctrl import ControlType
+except ImportError:
+    from waypoints import makeWaypoints
+    import config
+    from ctrl import ControlType
 
 class Trajectory:
 

@@ -21,8 +21,13 @@ import sys
 import os
 simulation_path = os.path.join(os.path.dirname(__file__), 'Quadcopter_SimCon', 'Simulation')
 
-from . import utils
-from . import config
+# Support both relative and absolute imports
+try:
+    from . import utils
+    from . import config
+except ImportError:
+    import utils
+    import config
 from copy import deepcopy
 from enum import Enum
 
@@ -49,11 +54,11 @@ Pz    = 1.0
 pos_P_gain = np.array([Px, Py, Pz])
 
 # Velocity P-D gains
-Pxdot = 3
-Dxdot = 1
-Ixdot = 0.5
-FFxdot = 0.5
-FFdxdot = 0.25
+Pxdot = 1.5
+Dxdot = .25
+Ixdot = 0.1
+FFxdot = 0.0
+FFdxdot = 0.0
 
 Pydot = Pxdot
 Dydot = Dxdot

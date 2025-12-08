@@ -9,7 +9,12 @@ Please feel free to use and modify this, but keep the above information. Thanks!
 import numpy as np
 from numpy import sin, cos, pi
 import random as rd
-from .. import config
+
+# Support both relative and absolute imports
+try:
+    from .. import config
+except ImportError:
+    import config
 
 deg2rad = pi/180.0
 

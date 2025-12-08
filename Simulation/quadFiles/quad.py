@@ -13,10 +13,18 @@ import sys
 import os
 simulation_path = os.path.join(os.path.dirname(__file__), 'Quadcopter_SimCon', 'Simulation')
 sys.path.append(simulation_path)
-from .initQuad import sys_params, init_cmd, init_state
-from ..utils.windModel import Wind
-from .. import utils
-from .. import config
+
+# Support both relative and absolute imports
+try:
+    from .initQuad import sys_params, init_cmd, init_state
+    from ..utils.windModel import Wind
+    from .. import utils
+    from .. import config
+except ImportError:
+    from quadFiles.initQuad import sys_params, init_cmd, init_state
+    from utils.windModel import Wind
+    import utils
+    import config
 
 deg2rad = pi/180.0
 

@@ -14,7 +14,7 @@ import cProfile
 from trajectory import Trajectory
 from ctrl import Control, ControlType
 from quadFiles.quad import Quadcopter
-from utils.windModel import Wind
+from utils.windModel import Wind 
 import utils
 import config
 from load_ulg import load_ulg
@@ -101,10 +101,13 @@ def quad_sim(t, Ts, quad, ctrl, wind, traj):
 
     # Generate Commands (for next iteration)
     # ---------------------------
-    ctrl.controller(traj, quad, sDes, Ts)
+    ctrl.controller(traj=traj, quad=quad, Ts=Ts)
 
     return t
     
+def getStartOffboardInds(timestamp, data):
+    offboard_inds = np.where(data == 1)[0]
+    return offboard_inds[0]
 
 def main():
     start_time = time.time()
@@ -113,17 +116,42 @@ def main():
     #                     fields_to_extract=[['vehicle_local_position','vx'],['vehicle_local_position','vy'],
     #                                     ['vehicle_local_position_setpoint','vx'],['vehicle_local_position_setpoint','vy']],
     #                     startTime=8)
-        ulgData = load_ulg("/home/valentin/RL/TESTFLIGHTS/sininput.ulg", 
+    #     ulgData = load_ulg("/home/valentin/RL/TESTFLIGHTS/sininput.ulg", 
+    #                     fields_to_extract=[['vehicle_local_position','vx'],['vehicle_local_position','vy'],['vehicle_local_position','vz'],
+    #                                     ['vehicle_local_position_setpoint','vx'],['vehicle_local_position_setpoint','vy'],['vehicle_local_position_setpoint','vz'],
+    #                                     ['vehicle_attitude','roll'],['vehicle_attitude','pitch'],['vehicle_attitude','yaw'],
+    #                                     ['vehicle_attitude_setpoint','roll_body'],['vehicle_attitude_setpoint','pitch_body'],['vehicle_attitude_setpoint','yaw_body'],
+    #                                     ['vehicle_rates_setpoint','pitch'],['vehicle_rates_setpoint','roll'],['vehicle_rates_setpoint','yaw'],
+    #                                     ['vehicle_angular_velocity','xyz[0]'],['vehicle_angular_velocity','xyz[1]'],['vehicle_angular_velocity','xyz[2]'],
+    #                                     ['vehicle_thrust_setpoint','xyz[0]'],['vehicle_thrust_setpoint','xyz[1]'],['vehicle_thrust_setpoint','xyz[2]']],
+    #                     startTime=264, verbose=True)
+        #  ulgData = load_ulg("/home/valentin/RL/TESTFLIGHTS/RLCat2_3blades/pidCircle.ulg", 
+        #                 fields_to_extract=[['vehicle_local_position','vx'],['vehicle_local_position','vy'],['vehicle_local_position','vz'],
+        #                                 ['vehicle_local_position_setpoint','vx'],['vehicle_local_position_setpoint','vy'],['vehicle_local_position_setpoint','vz'],
+        #                                 ['vehicle_attitude','roll'],['vehicle_attitude','pitch'],['vehicle_attitude','yaw'],
+        #                                 ['vehicle_attitude_setpoint','roll_body'],['vehicle_attitude_setpoint','pitch_body'],['vehicle_attitude_setpoint','yaw_body'],
+        #                                 ['vehicle_rates_setpoint','pitch'],['vehicle_rates_setpoint','roll'],['vehicle_rates_setpoint','yaw'],
+        #                                 ['vehicle_angular_velocity','xyz[0]'],['vehicle_angular_velocity','xyz[1]'],['vehicle_angular_velocity','xyz[2]'],
+        #                                 ['vehicle_thrust_setpoint','xyz[0]'],['vehicle_thrust_setpoint','xyz[1]'],['vehicle_thrust_setpoint','xyz[2]'],
+        #                                 ['vehicle_control_mode','flag_control_offboard_enabled']],
+        #                 startTime=264+65, verbose=True)
+         ulgData = load_ulg("/home/valentin/RL/TESTFLIGHTS/RLCat1_5blades/pidWithCircle.ulg", 
                         fields_to_extract=[['vehicle_local_position','vx'],['vehicle_local_position','vy'],['vehicle_local_position','vz'],
                                         ['vehicle_local_position_setpoint','vx'],['vehicle_local_position_setpoint','vy'],['vehicle_local_position_setpoint','vz'],
                                         ['vehicle_attitude','roll'],['vehicle_attitude','pitch'],['vehicle_attitude','yaw'],
                                         ['vehicle_attitude_setpoint','roll_body'],['vehicle_attitude_setpoint','pitch_body'],['vehicle_attitude_setpoint','yaw_body'],
                                         ['vehicle_rates_setpoint','pitch'],['vehicle_rates_setpoint','roll'],['vehicle_rates_setpoint','yaw'],
                                         ['vehicle_angular_velocity','xyz[0]'],['vehicle_angular_velocity','xyz[1]'],['vehicle_angular_velocity','xyz[2]'],
-                                        ['vehicle_thrust_setpoint','xyz[0]'],['vehicle_thrust_setpoint','xyz[1]'],['vehicle_thrust_setpoint','xyz[2]']],
-                        startTime=264, verbose=True)
+                                        ['vehicle_thrust_setpoint','xyz[0]'],['vehicle_thrust_setpoint','xyz[1]'],['vehicle_thrust_setpoint','xyz[2]'],
+                                        ['vehicle_control_mode','flag_control_offboard_enabled']],
+                        startTime=247+150, verbose=True)
+         offinds = getStartOffboardInds(ulgData['vehicle_control_mode_flag_control_offboard_enabled']['timestamp'], ulgData['vehicle_control_mode_flag_control_offboard_enabled']['data'])
+         offstartTime=ulgData['vehicle_control_mode_flag_control_offboard_enabled']['timestamp'][offinds]
+         Tf = ulgData['vehicle_control_mode_flag_control_offboard_enabled']['timestamp'][-10]
+         pass
     else:
         ulgData = None
+        Tf=None
 
     # plt.figure(1)
     # plt.subplot(3, 1, 1)
@@ -159,7 +187,7 @@ def main():
     # --------------------------- 
     Ti = 0
     Ts = 0.002
-    Tf = 50
+    Tf = Tf if Tf is not None else 50
     ifsave = 0
  
     # Choose trajectory settings
@@ -170,7 +198,7 @@ def main():
     # For attitude target (angles + thrust, rates calculated): use ControlType.ATT
     # For attitude rate target (rates + thrust, bypasses attitude_control): use ControlType.ATT_RATE
     # ControlType: XYZ_POS, XY_VEL_Z_POS, XYZ_VEL, ATT, ATT_RATE
-    ctrlType = ControlType.XYZ_VEL if (LOAD_ULG_DATA and ulgData is not None) else ControlType.XYZ_POS
+    ctrlType = ControlType.XY_VEL_Z_POS if (LOAD_ULG_DATA and ulgData is not None) else ControlType.XYZ_POS
     # Select Position Trajectory Type (0: hover,                    1: pos_waypoint_timed,      2: pos_waypoint_interp,    
     #                                  3: minimum velocity          4: minimum accel,           5: minimum jerk,           6: minimum snap
     #                                  7: minimum accel_stop        8: minimum jerk_stop        9: minimum snap_stop
@@ -196,7 +224,7 @@ def main():
 
     # Generate First Commands
     # ---------------------------
-    ctrl.controller(traj, quad, sDes, Ts)
+    ctrl.controller(traj, quad, Ts)
     
     # Initialize Result Matrixes
     # ---------------------------
@@ -240,20 +268,22 @@ def main():
         t = quad_sim(t, Ts, quad, ctrl, wind, traj)
         
         # print("{:.3f}".format(t))
-        t_all[i]             = t
-        s_all[i,:]           = quad.state
-        pos_all[i,:]         = quad.pos
-        vel_all[i,:]         = quad.vel
-        quat_all[i,:]        = quad.quat
-        omega_all[i,:]       = quad.omega
-        euler_all[i,:]       = quad.euler
-        sDes_traj_all[i,:]   = traj.sDes
-        sDes_calc_all[i,:]   = ctrl.sDesCalc
-        w_cmd_all[i,:]       = ctrl.w_cmd
-        wMotor_all[i,:]      = quad.wMotor
-        thr_all[i,:]         = quad.thr
-        tor_all[i,:]         = quad.tor
-        
+        try:
+            t_all[i]             = t
+            s_all[i,:]           = quad.state
+            pos_all[i,:]         = quad.pos
+            vel_all[i,:]         = quad.vel
+            quat_all[i,:]        = quad.quat
+            omega_all[i,:]       = quad.omega
+            euler_all[i,:]       = quad.euler
+            sDes_traj_all[i,:]   = traj.sDes
+            sDes_calc_all[i,:]   = ctrl.sDesCalc
+            w_cmd_all[i,:]       = ctrl.w_cmd
+            wMotor_all[i,:]      = quad.wMotor
+            thr_all[i,:]         = quad.thr
+            tor_all[i,:]         = quad.tor
+        except:
+            break
         i += 1
     
     end_time = time.time()
