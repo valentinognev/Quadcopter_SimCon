@@ -13,7 +13,7 @@ from numpy.linalg import norm
 
 # Normalize quaternion, or any vector
 def vectNormalize(q):
-    return q/norm(q)
+    return q/norm(q, axis=0)
 
 
 # Quaternion multiplication

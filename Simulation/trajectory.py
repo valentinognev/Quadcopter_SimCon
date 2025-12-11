@@ -30,89 +30,85 @@ except ImportError:
 
 class Trajectory:
 
-    def __init__(self, quad, ctrlType: ControlType, trajSelect=np.zeros(3), ulgData=None):
+    def __init__(self, quads, ctrlType: ControlType, trajSelect=np.zeros(3)):
 
-        self.ulgData = ulgData
-        self.maxThr = quad.params["maxThr"]  # Maximum total thrust [Nt] for converting percentage to physical units
+        self.numOfQuads = quads.numOfQuads
+        self.maxThr = quads.params["maxThr"]  # Maximum total thrust [Nt] for converting percentage to physical units
         
         self.ctrlType = ctrlType
         self.xyzType = trajSelect[0]
         self.yawType = trajSelect[1]
         self.averVel = trajSelect[2]
 
-        t_wps, wps, y_wps, v_wp = makeWaypoints()
-        self.t_wps = t_wps
-        self.wps   = wps
-        self.y_wps = y_wps
-        self.v_wp  = v_wp
-
+        self.t_wps, self.wps, self.y_wps, self.v_wp = makeWaypoints(self.numOfQuads)
         self.end_reached = 0
 
         if (self.ctrlType == ControlType.XYZ_POS):
             self.T_segment = np.diff(self.t_wps)
 
             if (self.averVel == 1):
-                distance_segment = self.wps[1:] - self.wps[:-1]
-                self.T_segment = np.sqrt(distance_segment[:,0]**2 + distance_segment[:,1]**2 + distance_segment[:,2]**2)/self.v_wp
-                self.t_wps = np.zeros(len(self.T_segment) + 1)
-                self.t_wps[1:] = np.cumsum(self.T_segment)
+                distance_segment = self.wps[3:,:] - self.wps[:-3,:]
+                dist = np.sqrt(distance_segment[0::3,:]**2 + distance_segment[1::3,:]**2 + distance_segment[2::3,:]**2)
+                self.T_segment = dist*(np.outer(np.ones(dist.shape[0]), 1/self.v_wp))
+                self.t_wps = np.zeros((self.T_segment.shape[0] + 1, self.numOfQuads))
+                self.t_wps[1:,:] = np.cumsum(self.T_segment, axis=0)
             
-            if (self.xyzType >= 3 and self.xyzType <= 6):
-                self.deriv_order = int(self.xyzType-2)       # Looking to minimize which derivative order (eg: Minimum velocity -> first order)
+            # if (self.xyzType >= 3 and self.xyzType <= 6):
+            #     self.deriv_order = int(self.xyzType-2)       # Looking to minimize which derivative order (eg: Minimum velocity -> first order)
 
-                # Calculate coefficients
-                self.coeff_x = minSomethingTraj(self.wps[:,0], self.T_segment, self.deriv_order)
-                self.coeff_y = minSomethingTraj(self.wps[:,1], self.T_segment, self.deriv_order)
-                self.coeff_z = minSomethingTraj(self.wps[:,2], self.T_segment, self.deriv_order)
+            #     # Calculate coefficients
+            #     self.coeff_x = minSomethingTraj(self.wps[:,0], self.T_segment, self.deriv_order)
+            #     self.coeff_y = minSomethingTraj(self.wps[:,1], self.T_segment, self.deriv_order)
+            #     self.coeff_z = minSomethingTraj(self.wps[:,2], self.T_segment, self.deriv_order)
 
-            elif (self.xyzType >= 7 and self.xyzType <= 9):
-                self.deriv_order = int(self.xyzType-5)       # Looking to minimize which derivative order (eg: Minimum accel -> second order)
+            # elif (self.xyzType >= 7 and self.xyzType <= 9):
+            #     self.deriv_order = int(self.xyzType-5)       # Looking to minimize which derivative order (eg: Minimum accel -> second order)
 
-                # Calculate coefficients
-                self.coeff_x = minSomethingTraj_stop(self.wps[:,0], self.T_segment, self.deriv_order)
-                self.coeff_y = minSomethingTraj_stop(self.wps[:,1], self.T_segment, self.deriv_order)
-                self.coeff_z = minSomethingTraj_stop(self.wps[:,2], self.T_segment, self.deriv_order)
+            #     # Calculate coefficients
+            #     self.coeff_x = minSomethingTraj_stop(self.wps[:,0], self.T_segment, self.deriv_order)
+            #     self.coeff_y = minSomethingTraj_stop(self.wps[:,1], self.T_segment, self.deriv_order)
+            #     self.coeff_z = minSomethingTraj_stop(self.wps[:,2], self.T_segment, self.deriv_order)
             
-            elif (self.xyzType >= 10 and self.xyzType <= 11):
-                self.deriv_order = int(self.xyzType-7)       # Looking to minimize which derivative order (eg: Minimum jerk -> third order)
+            # elif (self.xyzType >= 10 and self.xyzType <= 11):
+            #     self.deriv_order = int(self.xyzType-7)       # Looking to minimize which derivative order (eg: Minimum jerk -> third order)
 
-                # Calculate coefficients
-                self.coeff_x = minSomethingTraj_faststop(self.wps[:,0], self.T_segment, self.deriv_order)
-                self.coeff_y = minSomethingTraj_faststop(self.wps[:,1], self.T_segment, self.deriv_order)
-                self.coeff_z = minSomethingTraj_faststop(self.wps[:,2], self.T_segment, self.deriv_order)
+            #     # Calculate coefficients
+            #     self.coeff_x = minSomethingTraj_faststop(self.wps[:,0], self.T_segment, self.deriv_order)
+            #     self.coeff_y = minSomethingTraj_faststop(self.wps[:,1], self.T_segment, self.deriv_order)
+            #     self.coeff_z = minSomethingTraj_faststop(self.wps[:,2], self.T_segment, self.deriv_order)
         
         if (self.yawType == 4):
             self.y_wps = np.zeros(len(self.t_wps))
         
         # Get initial heading
-        self.current_heading = quad.psi
+        self.current_heading = quads.psi
         
         # Initialize trajectory setpoint
-        self.desPos = np.zeros(3)    # Desired position (x, y, z)
-        self.desVel = np.zeros(3)    # Desired velocity (xdot, ydot, zdot)
-        self.desAcc = np.zeros(3)    # Desired acceleration (xdotdot, ydotdot, zdotdot)
-        self.desThr = np.zeros(3)    # Desired thrust in N-E-D directions (or E-N-U, if selected)
-        self.desEul = np.zeros(3)    # Desired orientation in the world frame (phi, theta, psi)
-        self.desPQR = np.zeros(3)    # Desired angular velocity in the body frame (p, q, r)
-        self.desYawRate = 0.         # Desired yaw speed
-        self.sDes = np.hstack((self.desPos, self.desVel, self.desAcc, self.desThr, self.desEul, self.desPQR, self.desYawRate)).astype(float)
+        self.desPos = np.zeros((3, self.numOfQuads))    # Desired position (x, y, z)
+        self.desVel = np.zeros((3, self.numOfQuads))    # Desired velocity (xdot, ydot, zdot)
+        self.desAcc = np.zeros((3, self.numOfQuads))    # Desired acceleration (xdotdot, ydotdot, zdotdot)
+        self.desThr = np.zeros((3, self.numOfQuads))    # Desired thrust in N-E-D directions (or E-N-U, if selected)
+        self.desEul = np.zeros((3, self.numOfQuads))    # Desired orientation in the world frame (phi, theta, psi)
+        self.desPQR = np.zeros((3, self.numOfQuads))    # Desired angular velocity in the body frame (p, q, r)
+        self.desYawRate = np.zeros((1, self.numOfQuads))         # Desired yaw speed
+        self.sDes = np.concatenate([self.desPos, self.desVel, self.desAcc, self.desThr, self.desEul, self.desPQR, self.desYawRate], axis=0).astype(float)
 
 
-    def desiredState(self, t, Ts, quad, desired=None):
+    def desiredState(self, t, Ts, quads, desired=None):
         
-        self.desPos = np.zeros(3)    # Desired position (x, y, z)
-        self.desVel = np.zeros(3)    # Desired velocity (xdot, ydot, zdot)
-        self.desAcc = np.zeros(3)    # Desired acceleration (xdotdot, ydotdot, zdotdot)
-        self.desThr = np.zeros(3)    # Desired thrust in N-E-D directions (or E-N-U, if selected)
-        self.desEul = np.zeros(3)    # Desired orientation in the world frame (phi, theta, psi)
-        self.desPQR = np.zeros(3)    # Desired angular velocity in the body frame (p, q, r)
-        self.desYawRate = 0.         # Desired yaw speed
+        self.desPos = np.zeros((3, self.numOfQuads))    # Desired position (x, y, z)
+        self.desVel = np.zeros((3, self.numOfQuads))    # Desired velocity (xdot, ydot, zdot)
+        self.desAcc = np.zeros((3, self.numOfQuads))    # Desired acceleration (xdotdot, ydotdot, zdotdot)
+        self.desThr = np.zeros((3, self.numOfQuads))    # Desired thrust in N-E-D directions (or E-N-U, if selected)
+        self.desEul = np.zeros((3, self.numOfQuads))    # Desired orientation in the world frame (phi, theta, psi)
+        self.desPQR = np.zeros((3, self.numOfQuads))    # Desired angular velocity in the body frame (p, q, r)
+        self.desYawRate = np.zeros((1, self.numOfQuads))         # Desired yaw speed
 
         def pos_waypoint_timed():
             
-            if not (len(self.t_wps) == self.wps.shape[0]):
+            if not (self.t_wps.shape[0] == self.wps[::3,:].shape[0]):
                 raise Exception("Time array and waypoint array not the same size.")
-            elif (np.diff(self.t_wps) <= 0).any():
+            elif (np.diff(self.t_wps, axis=0) <= 0).any():
                 raise Exception("Time array isn't properly ordered.")  
             
             if (t == 0):
@@ -122,12 +118,12 @@ class Trajectory:
             else:
                 self.t_idx = np.where(t <= self.t_wps)[0][0]# - 1
             
-            self.desPos = self.wps[self.t_idx,:]
+            self.desPos = self.wps[self.t_idx*3:self.t_idx*3+3,:]
             pass                
         
         def pos_waypoint_interp():
             
-            if not (len(self.t_wps) == self.wps.shape[0]):
+            if not (self.t_wps.shape[0] == self.wps[::3,:].shape[0]):
                 raise Exception("Time array and waypoint array not the same size.")
             elif (np.diff(self.t_wps) <= 0).any():
                 raise Exception("Time array isn't properly ordered.") 
@@ -149,7 +145,7 @@ class Trajectory:
             minimum velocity, acceleration, jerk or snap trajectory which goes through each waypoint. 
             The output is the desired state associated with the next waypoint for the time t.
             """
-            if not (len(self.t_wps) == self.wps.shape[0]):
+            if not (self.t_wps.shape[0] == self.wps[::3,:].shape[0]):
                 raise Exception("Time array and waypoint array not the same size.")
                 
             nb_coeff = self.deriv_order*2
@@ -255,21 +251,21 @@ class Trajectory:
                 delta_psi = self.desEul[2] - self.current_heading
                 
                 # Set Yaw rate
-                self.desYawRate = delta_psi / Ts 
+                self.desYawRate = np.atleast_2d(delta_psi / Ts) 
 
                 # Prepare next iteration
                 self.current_heading = self.desEul[2]
             pass                
 
-        def yaw_follow():
-
+        def yaw_follow(quads):
+            desPos = self.desPos[:,0]
             if (self.xyzType == 1 or self.xyzType == 2 or self.xyzType == 12):
                 if (t == 0):
                     self.desEul[2] = 0
                 else:
                     # Calculate desired Yaw
-                    self.desEul[2] = np.arctan2(self.desPos[1]-quad.pos[1], self.desPos[0]-quad.pos[0])
-            
+                    self.desEul[2] = np.arctan2(self.desPos[1,0]-quads.pos[0,1], self.desPos[0,0]-quads.pos[0,0])
+                    pass
             elif (self.xyzType == 13):
                 if (t == 0):
                     self.desEul[2] = 0
@@ -277,7 +273,7 @@ class Trajectory:
                 else:
                     if not (self.arrived):
                         # Calculate desired Yaw
-                        self.desEul[2] = np.arctan2(self.desPos[1]-quad.pos[1], self.desPos[0]-quad.pos[0])
+                        self.desEul[2] = np.arctan2(self.desPos[1,0]-quads.pos[0,1], self.desPos[0,0]-quads.pos[0,0])
                         self.prevDesYaw = self.desEul[2]
                     else:
                         self.desEul[2] = self.prevDesYaw
@@ -290,14 +286,17 @@ class Trajectory:
                     self.desEul[2] = np.arctan2(self.desVel[1], self.desVel[0])
                     
             # Dirty hack, detect when desEul[2] switches from -pi to pi (or vice-versa) and switch manualy current_heading 
-            if (np.sign(self.desEul[2]) - np.sign(self.current_heading) and abs(self.desEul[2]-self.current_heading) >= 2*pi-0.1):
-                self.current_heading = self.current_heading + np.sign(self.desEul[2])*2*pi
+            sign_changed = (np.sign(self.desEul[2]) != np.sign(self.current_heading))
+            large_diff = (np.abs(self.desEul[2] - self.current_heading) >= 2*pi - 0.1)
+            condition = sign_changed & large_diff
+            if condition.any():
+                self.current_heading[condition] = self.current_heading[condition] + np.sign(self.desEul[2][condition]) * 2*pi
             
             # Angle between current vector with the next heading vector
             delta_psi = self.desEul[2] - self.current_heading
             
             # Set Yaw rate
-            self.desYawRate = delta_psi / Ts 
+            self.desYawRate = np.atleast_2d(delta_psi / Ts) 
 
             # Prepare next iteration
             self.current_heading = self.desEul[2]
@@ -370,9 +369,9 @@ class Trajectory:
                     yaw_waypoint_interp()
                 # Have the drone's heading match its desired velocity direction
                 elif (self.yawType == 3):
-                    yaw_follow()
+                    yaw_follow(quads)
 
-                self.sDes = np.hstack((self.desPos, self.desVel, self.desAcc, self.desThr, self.desEul, self.desPQR, self.desYawRate)).astype(float)
+                self.sDes = np.concatenate((self.desPos, self.desVel, self.desAcc, self.desThr, self.desEul, self.desPQR, self.desYawRate), axis=0).astype(float)
         
         return self.sDes
 

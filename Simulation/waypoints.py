@@ -17,7 +17,7 @@ except ImportError:
 
 deg2rad = pi/180.0
 
-def makeWaypoints():
+def makeWaypoints(numOfQuads):
     
     v_average = 1
 
@@ -37,6 +37,16 @@ def makeWaypoints():
 
     t = np.hstack((t_ini, t)).astype(float)
     wp = np.vstack((wp_ini, wp)).astype(float)
-    yaw = np.hstack((yaw_ini, yaw)).astype(float)*deg2rad
-
-    return t, wp, yaw, v_average
+    yaw = np.array([np.hstack((yaw_ini, yaw)).astype(float)*deg2rad])
+    waypoints = np.outer(wp,np.ones(numOfQuads))
+    
+    xdelta = np.array(np.arange(numOfQuads))*3
+    ydelta = np.zeros(numOfQuads)
+    zdelta = np.zeros(numOfQuads)
+    deltaposSingle = np.array([xdelta, ydelta, zdelta])
+    deltapos = np.concatenate([deltaposSingle for _ in range(wp.shape[0])], axis=0)
+    waypoints = waypoints + deltapos
+    return np.outer(t,np.ones(numOfQuads)), \
+           waypoints, \
+           np.outer(yaw,np.ones(numOfQuads)), \
+           np.outer(v_average,np.ones(numOfQuads))

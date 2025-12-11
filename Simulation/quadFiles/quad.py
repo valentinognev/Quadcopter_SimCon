@@ -28,10 +28,11 @@ except ImportError:
 
 deg2rad = pi/180.0
 
-class Quadcopter:
+class QuadcopterSwarm:
 
-    def __init__(self, Ti):
+    def __init__(self, Ti, numOfQuads):
         
+        self.numOfQuads = numOfQuads
         # Quad Params
         # ---------------------------
         self.params = sys_params()
@@ -44,19 +45,26 @@ class Quadcopter:
         self.params["thr_hover"] = ini_hover[2]  # Motor Thrust for Hover  
         self.thr = np.ones(4)*ini_hover[2]
         self.tor = np.ones(4)*ini_hover[3]
+        
+        self.psi = np.zeros(numOfQuads)
+        self.theta = np.zeros(numOfQuads)
+        self.phi = np.zeros(numOfQuads)
+        self.euler = np.zeros((numOfQuads, 3))
+        self.dcm = np.zeros((numOfQuads, 3, 3))
 
         # Initial State
         # ---------------------------
-        self.state = init_state(self.params)
+        single_state = init_state(self.params)
+        self.state = np.tile(single_state, (numOfQuads, 1))
 
-        self.pos   = self.state[0:3]
-        self.quat  = self.state[3:7]
-        self.vel   = self.state[7:10]
-        self.omega = self.state[10:13]
-        self.wMotor = np.array([self.state[13], self.state[14], self.state[15], self.state[16]])
-        self.vel_dot = np.zeros(3)
-        self.omega_dot = np.zeros(3)
-        self.acc = np.zeros(3)
+        self.pos   = self.state[:, 0:3]
+        self.quat  = self.state[:, 3:7]
+        self.vel   = self.state[:, 7:10]
+        self.omega = self.state[:, 10:13]
+        self.wMotor = np.array([self.state[:, 13], self.state[:, 14], self.state[:, 15], self.state[:, 16]])
+        self.vel_dot = np.zeros((numOfQuads, 3))
+        self.omega_dot = np.zeros((numOfQuads, 3))
+        self.acc = np.zeros((numOfQuads, 3))
 
         self.extended_state()
         self.forces()
@@ -66,18 +74,37 @@ class Quadcopter:
         self.integrator = ode(self.state_dot).set_integrator('dopri5', first_step='0.00005', atol='1e-6', rtol='1e-6')
         self.integrator.set_initial_value(self.state, Ti)
 
+    def setQuadPos(self, pos, quadIndex):
+        self.pos[quadIndex,:] = pos
+        
+    def setQuadQuat(self, quat, quadIndex):
+        self.quat[quadIndex,:] = quat
+        
+    def setQuadEuler(self, RPY, quadIndex):
+        self.euler[quadIndex,:] = RPY[::-1] # flip RPY to YPR so that euler state = phi, theta, psi
+        self.quat = utils.YPRToQuat(self.euler[quadIndex,0], self.euler[quadIndex,1], self.euler[quadIndex,2])
+        
+    def setQuadVel(self, vel, quadIndex):
+        self.vel[quadIndex,:] = vel
+    # def setQuadOmega(self, omega, quadIndex):
+    #     self.omega[quadIndex,:] = omega
+    # def setQuadWMotor(self, wMotor, quadIndex):
+    #     self.wMotor[quadIndex,:] = wMotor
 
     def extended_state(self):
 
         # Rotation Matrix of current state (Direct Cosine Matrix)
-        self.dcm = utils.quat2Dcm(self.quat)
+        for i in range(self.numOfQuads):
+            self.dcm[i,:,:] = utils.quat2Dcm(self.quat[i,:])
 
         # Euler angles of current state
-        YPR = utils.quatToYPR_ZYX(self.quat)
+        YPR = np.zeros((self.numOfQuads, 3))
+        for i in range(self.numOfQuads):
+            YPR[i,:] = utils.quatToYPR_ZYX(self.quat[i,:])
         self.euler = YPR[::-1] # flip YPR so that euler state = phi, theta, psi
-        self.psi   = YPR[0]
-        self.theta = YPR[1]
-        self.phi   = YPR[2]
+        self.psi[:] = YPR[:,0]
+        self.theta[:] = YPR[:,1]
+        self.phi[:] = YPR[:,2]
 
     
     def forces(self):
