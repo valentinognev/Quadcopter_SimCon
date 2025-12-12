@@ -43,15 +43,15 @@ def getStartOffboardInds(timestamp, data):
     return offboard_inds[0]
 
 def main():
-    numOfQuads = 5
+    numOfQuads = 4
     Ti = 0
     Ts = 0.02
     Tf = 10
-    quads = QuadcopterSwarm(Ti, numOfQuads)
-    # quads.setQuadPos(np.array([0, 0, 0]), 0)
-    # quads.setQuadPos(np.array([1, 0, 0]), 1)
-    # quads.setQuadPos(np.array([0, 1, 0]), 2)
-    # quads.setQuadPos(np.array([0, 0, 1]), 3)
+    quads = QuadcopterSwarm(numOfQuads=numOfQuads, Ti=Ti)
+    quads.setInitialQuadPos(np.array([0, 0, 0]), 0)
+    quads.setInitialQuadPos(np.array([10, 0, 0]), 1)
+    quads.setInitialQuadPos(np.array([0, 10, 0]), 2)
+    quads.setInitialQuadPos(np.array([0, 0, 10]), 3)
     start_time = time.time()
 
     # Simulation Setup

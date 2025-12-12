@@ -40,7 +40,7 @@ def makeWaypoints(numOfQuads):
     yaw = np.array([np.hstack((yaw_ini, yaw)).astype(float)*deg2rad])
     waypoints = np.outer(wp,np.ones(numOfQuads))
     
-    xdelta = np.array(np.arange(numOfQuads))*0  #3
+    xdelta = np.array(np.arange(numOfQuads))*3
     ydelta = np.zeros(numOfQuads)
     zdelta = np.zeros(numOfQuads)
     deltaposSingle = np.array([xdelta, ydelta, zdelta])

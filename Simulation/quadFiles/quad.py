@@ -30,9 +30,10 @@ deg2rad = pi/180.0
 
 class QuadcopterSwarm:
 
-    def __init__(self, Ti, numOfQuads):
+    def __init__(self, numOfQuads, Ti=0):
         
         self.numOfQuads = numOfQuads
+        self.Ti = Ti
         # Quad Params
         # ---------------------------
         self.params = sys_params()
@@ -75,22 +76,37 @@ class QuadcopterSwarm:
         self.integratorState = self.state.flatten()
         self.integrator.set_initial_value(self.integratorState, Ti)
 
-    def setQuadPos(self, pos, quadIndex):
+    def setInitialQuadPos(self, pos, quadIndex):
         self.pos[quadIndex,:] = pos
+        self.state[quadIndex,0:3] = pos
+        self.integratorState = self.state.flatten()
+        self.integrator.set_initial_value(self.integratorState, self.Ti)
         
-    def setQuadQuat(self, quat, quadIndex):
+    def setInitialQuadQuat(self, quat, quadIndex):
         self.quat[quadIndex,:] = quat
+        self.state[quadIndex,3:7] = quat
+        self.integratorState = self.state.flatten()
+        self.integrator.set_initial_value(self.integratorState, self.Ti)
         
-    def setQuadEuler(self, RPY, quadIndex):
+    def setInitialQuadEuler(self, RPY, quadIndex):
         self.euler[quadIndex,:] = RPY[::-1] # flip RPY to YPR so that euler state = phi, theta, psi
         self.quat = utils.YPRToQuat(self.euler[quadIndex,0], self.euler[quadIndex,1], self.euler[quadIndex,2])
+        self.state[quadIndex,3:7] = self.quat
+        self.integratorState = self.state.flatten()
+        self.integrator.set_initial_value(self.integratorState, self.Ti)
         
-    def setQuadVel(self, vel, quadIndex):
+    def setInitialQuadVel(self, vel, quadIndex):
         self.vel[quadIndex,:] = vel
+        self.state[quadIndex,7:10] = vel
+        self.integratorState = self.state.flatten()
+        self.integrator.set_initial_value(self.integratorState, self.Ti)
+        
     # def setQuadOmega(self, omega, quadIndex):
     #     self.omega[quadIndex,:] = omega
+    #     self.state[quadIndex,10:13] = omega
     # def setQuadWMotor(self, wMotor, quadIndex):
     #     self.wMotor[quadIndex,:] = wMotor
+    #     self.state[quadIndex,13:17] = wMotor
 
     def extended_state(self):
 
