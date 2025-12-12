@@ -249,7 +249,7 @@ class Control:
         # --------------------------- 
         pos_z_error = self.pos_sp[2] - quads.pos.T[2]
         self.vel_sp[2] += pos_P_gain[2]*pos_z_error
-        
+        pass
     
     def xy_pos_control(self, quads, Ts):
 
@@ -257,7 +257,7 @@ class Control:
         # --------------------------- 
         pos_xy_error = (self.pos_sp[0:2] - quads.pos.T[0:2])
         self.vel_sp[0:2] += (np.outer(pos_P_gain[0:2], np.ones(quads.numOfQuads)))*pos_xy_error
-        
+        pass
         
     def saturateVel(self, quads):
 
@@ -274,7 +274,7 @@ class Control:
                 # Divide by current magnitude and multiply by max allowed magnitude
                 scale_factor = np.where(exceeds_limit, velMaxAll / totalVel_sp, 1.0)
                 self.vel_sp = self.vel_sp * scale_factor[np.newaxis, :]
-
+        pass
 
     def z_vel_control(self, quads, Ts):
         
@@ -386,7 +386,7 @@ class Control:
     def attitude_control(self, quads, Ts):
 
         # Current thrust orientation e_z and desired thrust orientation e_z_d
-        e_z = quads.dcm[:,2,:].T  # shape: (3, numOfQuads)
+        e_z = quads.dcm[:,:,2].T  # shape: (3, numOfQuads)
         e_z_d = -utils.vectNormalize(self.thrust_sp)  # shape: (3, numOfQuads)
         if (config.orient == "ENU"):
             e_z_d = -e_z_d
@@ -431,9 +431,9 @@ class Control:
             dcm_inv = utils.quat2Dcm(utils.inverse(quads.quat[i, :]))
             self.rate_sp[:, i] += dcm_inv[:, 2]*yawFF_i
 
-        # Limit rate setpoint
-        # rateMax is (3,), need to reshape to (3, 1) for broadcasting with (3, numOfQuads)
-        self.rate_sp = np.clip(self.rate_sp, -rateMax[:, np.newaxis], rateMax[:, np.newaxis])
+            # Limit rate setpoint
+            # rateMax is (3,), need to reshape to (3, 1) for broadcasting with (3, numOfQuads)
+            self.rate_sp[:, i] = np.clip(self.rate_sp[:, i], -rateMax, rateMax)
         pass
 
     def rate_control(self, quads, Ts):
@@ -452,5 +452,4 @@ class Control:
         self.yaw_w = np.clip(att_P_gain[2]/roll_pitch_gain, 0.0, 1.0)
 
         att_P_gain[2] = roll_pitch_gain
-
-    
+        pass

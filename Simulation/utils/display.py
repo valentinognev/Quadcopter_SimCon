@@ -116,7 +116,8 @@ def makeFigures(params, time, pos_all, vel_all, quat_all, omega_all, euler_all, 
         plt.suptitle('Position: Simulated vs Setpoint')
         
         # X position
-        ax1 = plt.subplot(3, numOfQuads, qi*3+1)
+        ax1 = plt.subplot(3, numOfQuads, (1-1)*numOfQuads+qi+1)
+        plt.title('Quad '+str(qi))
         plt.plot(time, x, label='x (simulated)', linewidth=2)
         plt.plot(time, x_sp, '--', label='x (setpoint)', linewidth=2)
         plt.grid(True)
@@ -125,7 +126,7 @@ def makeFigures(params, time, pos_all, vel_all, quat_all, omega_all, euler_all, 
         plt.ylabel('X Position (m)')
         
         # Y position
-        ax2 = plt.subplot(3, numOfQuads, qi*3+2, sharex=ax1)
+        ax2 = plt.subplot(3, numOfQuads, (2-1)*numOfQuads+qi+1, sharex=ax1)
         plt.plot(time, y, label='y (simulated)', linewidth=2)
         plt.plot(time, y_sp, '--', label='y (setpoint)', linewidth=2)
         plt.grid(True)
@@ -134,7 +135,7 @@ def makeFigures(params, time, pos_all, vel_all, quat_all, omega_all, euler_all, 
         plt.ylabel('Y Position (m)')
         
         # Z position
-        ax3 = plt.subplot(3, numOfQuads, qi*3+3, sharex=ax1)
+        ax3 = plt.subplot(3, numOfQuads, (3-1)*numOfQuads+qi+1, sharex=ax1)
         plt.plot(time, z, label='z (simulated)', linewidth=2)
         plt.plot(time, z_sp, '--', label='z (setpoint)', linewidth=2)
         plt.grid(True)
@@ -149,7 +150,8 @@ def makeFigures(params, time, pos_all, vel_all, quat_all, omega_all, euler_all, 
         plt.suptitle('Velocity: Simulated vs Setpoint')
         
         # Vx velocity
-        ax1 = plt.subplot(3, numOfQuads, qi*3+1)
+        ax1 = plt.subplot(3, numOfQuads, (1-1)*numOfQuads+qi+1)
+        plt.title('Quad '+str(qi))
         plt.plot(time, xdot, label='Vx (simulated)', linewidth=2)
         plt.plot(time, Vx_sp, '--', label='Vx (setpoint)', linewidth=2)
         # Add ulg data if available
@@ -163,7 +165,7 @@ def makeFigures(params, time, pos_all, vel_all, quat_all, omega_all, euler_all, 
         plt.ylabel('Vx (m/s)')
         
         # Vy velocity
-        ax2 = plt.subplot(3, numOfQuads, qi*3+2, sharex=ax1)
+        ax2 = plt.subplot(3, numOfQuads, (2-1)*numOfQuads+qi+1, sharex=ax1)
         plt.plot(time, ydot, label='Vy (simulated)', linewidth=2)
         plt.plot(time, Vy_sp, '--', label='Vy (setpoint)', linewidth=2)
         # Add ulg data if available
@@ -177,7 +179,7 @@ def makeFigures(params, time, pos_all, vel_all, quat_all, omega_all, euler_all, 
         plt.ylabel('Vy (m/s)')
         
         # Vz velocity
-        ax3 = plt.subplot(3, numOfQuads, qi*3+3, sharex=ax1)
+        ax3 = plt.subplot(3, numOfQuads, (3-1)*numOfQuads+qi+1, sharex=ax1)
         plt.plot(time, zdot, label='Vz (simulated)', linewidth=2)
         plt.plot(time, Vz_sp, '--', label='Vz (setpoint)', linewidth=2)
         # Add ulg data if available
@@ -192,6 +194,9 @@ def makeFigures(params, time, pos_all, vel_all, quat_all, omega_all, euler_all, 
         plt.draw()
 
         plt.figure(3)
+        plt.suptitle('Desired Thrust')
+        plt.subplot(1, numOfQuads, qi+1)
+        plt.title('Quad '+str(qi))
         plt.plot(time, x_thr_sp, time, y_thr_sp, time, z_thr_sp)
         plt.grid(True)
         plt.legend(['x_thr_sp','y_thr_sp','z_thr_sp'])
@@ -205,7 +210,8 @@ def makeFigures(params, time, pos_all, vel_all, quat_all, omega_all, euler_all, 
         plt.suptitle('Euler Angles: Simulated vs Setpoint')
         
         # Roll
-        ax1 = plt.subplot(3, numOfQuads, qi*3+1)
+        ax1 = plt.subplot(3, numOfQuads, (1-1)*numOfQuads+qi+1)
+        plt.title('Quad '+str(qi))
         plt.plot(time, phi, label='Roll (simulated)', linewidth=2)
         plt.plot(time, phiDes, '--', label='Roll (setpoint calc)', linewidth=2)
         plt.plot(time, phi_sp_traj, ':', label='Roll (setpoint traj)', linewidth=2)
@@ -218,7 +224,7 @@ def makeFigures(params, time, pos_all, vel_all, quat_all, omega_all, euler_all, 
         plt.ylabel('Roll (°)')
         
         # Pitch
-        ax2 = plt.subplot(3, numOfQuads, qi*3+2, sharex=ax1)
+        ax2 = plt.subplot(3, numOfQuads, (2-1)*numOfQuads+qi+1, sharex=ax1)
         plt.plot(time, theta, label='Pitch (simulated)', linewidth=2)
         plt.plot(time, thetaDes, '--', label='Pitch (setpoint calc)', linewidth=2)
         plt.plot(time, theta_sp_traj, ':', label='Pitch (setpoint traj)', linewidth=2)
@@ -231,7 +237,7 @@ def makeFigures(params, time, pos_all, vel_all, quat_all, omega_all, euler_all, 
         plt.ylabel('Pitch (°)')
         
         # Yaw
-        ax3 = plt.subplot(3, numOfQuads, qi*3+3, sharex=ax1)
+        ax3 = plt.subplot(3, numOfQuads, (3-1)*numOfQuads+qi+1, sharex=ax1)
         plt.plot(time, psi, label='Yaw (simulated)', linewidth=2)
         plt.plot(time, psiDes, '--', label='Yaw (setpoint calc)', linewidth=2)
         plt.plot(time, psi_sp_traj, ':', label='Yaw (setpoint traj)', linewidth=2)
@@ -249,7 +255,8 @@ def makeFigures(params, time, pos_all, vel_all, quat_all, omega_all, euler_all, 
         plt.suptitle('Angular Rates: Simulated vs Setpoint')
         
         # Roll rate (p)
-        ax1 = plt.subplot(3, numOfQuads, qi*3+1)
+        ax1 = plt.subplot(3, numOfQuads, (1-1)*numOfQuads+qi+1)
+        plt.title('Quad '+str(qi))
         plt.plot(time, p, label='Roll Rate (p) - simulated', linewidth=2)
         plt.plot(time, pDes, '--', label='Roll Rate (p) - setpoint calc', linewidth=2)
         plt.plot(time, p_sp_traj, ':', label='Roll Rate (p) - setpoint traj', linewidth=2)
@@ -262,7 +269,7 @@ def makeFigures(params, time, pos_all, vel_all, quat_all, omega_all, euler_all, 
         plt.ylabel('Roll Rate (°/s)')
         
         # Pitch rate (q)
-        ax2 = plt.subplot(3, numOfQuads, qi*3+2, sharex=ax1)
+        ax2 = plt.subplot(3, numOfQuads, (2-1)*numOfQuads+qi+1, sharex=ax1)
         plt.plot(time, q, label='Pitch Rate (q) - simulated', linewidth=2)
         plt.plot(time, qDes, '--', label='Pitch Rate (q) - setpoint calc', linewidth=2)
         plt.plot(time, q_sp_traj, ':', label='Pitch Rate (q) - setpoint traj', linewidth=2)
@@ -275,7 +282,7 @@ def makeFigures(params, time, pos_all, vel_all, quat_all, omega_all, euler_all, 
         plt.ylabel('Pitch Rate (°/s)')
         
         # Yaw rate (r)
-        ax3 = plt.subplot(3, numOfQuads, qi*3+3, sharex=ax1)
+        ax3 = plt.subplot(3, numOfQuads, (3-1)*numOfQuads+qi+1, sharex=ax1)
         plt.plot(time, r, label='Yaw Rate (r) - simulated', linewidth=2)
         plt.plot(time, rDes, '--', label='Yaw Rate (r) - setpoint calc', linewidth=2)
         plt.plot(time, r_sp_traj, ':', label='Yaw Rate (r) - setpoint traj', linewidth=2)
@@ -289,6 +296,9 @@ def makeFigures(params, time, pos_all, vel_all, quat_all, omega_all, euler_all, 
         plt.draw()
 
         plt.figure(6)
+        plt.suptitle('Motor Angular Velocity')
+        plt.subplot(1, numOfQuads, qi+1)
+        plt.title('Quad '+str(qi))
         plt.plot(time, wM1, time, wM2, time, wM3, time, wM4)
         plt.plot(time, uM1, '--', time, uM2, '--', time, uM3, '--', time, uM4, '--')
         plt.grid(True)
@@ -298,7 +308,9 @@ def makeFigures(params, time, pos_all, vel_all, quat_all, omega_all, euler_all, 
         plt.draw()
 
         plt.figure(7)
-        ax1 = plt.subplot(2,1,1)
+        ax1 = plt.subplot(2, numOfQuads, (1-1)*numOfQuads+qi+1)
+        plt.suptitle('Thrust and Torque')
+        plt.title('Quad '+str(qi))
         plt.plot(time, thrust[:,0], time, thrust[:,1], time, thrust[:,2], time, thrust[:,3])
         plt.grid(True)
         plt.legend(['thr1','thr2','thr3','thr4'], loc='upper right')
@@ -306,7 +318,7 @@ def makeFigures(params, time, pos_all, vel_all, quat_all, omega_all, euler_all, 
         plt.ylabel('Rotor Thrust (N)')
         plt.draw()
 
-        ax2 = plt.subplot(2,1,2, sharex=ax1)
+        ax2 = plt.subplot(2, numOfQuads, (2-1)*numOfQuads+qi+1, sharex=ax1)
         plt.plot(time, torque[:,0], time, torque[:,1], time, torque[:,2], time, torque[:,3])
         plt.grid(True)
         plt.legend(['tor1','tor2','tor3','tor4'], loc='upper right')
@@ -315,22 +327,23 @@ def makeFigures(params, time, pos_all, vel_all, quat_all, omega_all, euler_all, 
         plt.draw()
 
         plt.figure(8)
-        ax1 = plt.subplot(3,1,1)
-        plt.title('Trajectory Setpoints')
+        ax1 = plt.subplot(3, numOfQuads, (1-1)*numOfQuads+qi+1)
+        plt.suptitle('Trajectory Setpoints')
+        plt.title('Quad '+str(qi))
         plt.plot(time, x_tr, time, y_tr, time, z_tr)
         plt.grid(True)
         plt.legend(['x','y','z'], loc='upper right')
         plt.xlabel('Time (s)')
         plt.ylabel('Position (m)')
 
-        ax2 = plt.subplot(3,1,2, sharex=ax1)
+        ax2 = plt.subplot(3, numOfQuads, (2-1)*numOfQuads+qi+1, sharex=ax1)
         plt.plot(time, Vx_tr, time, Vy_tr, time, Vz_tr)
         plt.grid(True)
         plt.legend(['Vx','Vy','Vz'], loc='upper right')
         plt.xlabel('Time (s)')
         plt.ylabel('Velocity (m/s)')
     
-        ax3 = plt.subplot(3,1,3, sharex=ax1)
+        ax3 = plt.subplot(3, numOfQuads, (3-1)*numOfQuads+qi+1, sharex=ax1)
         plt.plot(time, Ax_tr, time, Ay_tr, time, Az_tr)
         plt.grid(True)
         plt.legend(['Ax','Ay','Az'], loc='upper right')
@@ -339,6 +352,9 @@ def makeFigures(params, time, pos_all, vel_all, quat_all, omega_all, euler_all, 
         plt.draw()
 
         plt.figure(9)
+        plt.suptitle('Position Error')
+        plt.subplot(1, numOfQuads, qi+1)
+        plt.title('Quad '+str(qi))
         plt.plot(time, x_err, time, y_err, time, z_err)
         plt.grid(True)
         plt.legend(['Pos x error','Pos y error','Pos z error'])

@@ -71,8 +71,9 @@ class QuadcopterSwarm:
 
         # Set Integrator
         # ---------------------------
-        self.integrator = ode(self.state_dot).set_integrator('dopri5', first_step='0.00005', atol='1e-6', rtol='1e-6')
-        self.integrator.set_initial_value(self.state, Ti)
+        self.integrator = ode(self.state_dot_wrapper).set_integrator('dopri5', first_step='0.00005', atol='1e-6', rtol='1e-6')
+        self.integratorState = self.state.flatten()
+        self.integrator.set_initial_value(self.integratorState, Ti)
 
     def setQuadPos(self, pos, quadIndex):
         self.pos[quadIndex,:] = pos
@@ -113,6 +114,32 @@ class QuadcopterSwarm:
         self.thr = self.params["kTh"]*self.wMotor*self.wMotor
         self.tor = self.params["kTo"]*self.wMotor*self.wMotor
 
+    def state_dot_wrapper(self, t, state_flat, cmd, wind):
+        """
+        Wrapper function for the ODE integrator.
+        Converts flattened state to 2D, calls state_dot for each quad, and flattens the result.
+        
+        Args:
+            t: Time
+            state_flat: Flattened state vector (numOfQuads * 17 elements)
+            cmd: Motor commands, shape (4, numOfQuads) or (4,) for single quad
+            wind: Wind object
+            
+        Returns:
+            Flattened state derivative vector (numOfQuads * 17 elements)
+        """
+        # Reshape flattened state to (numOfQuads, 17)
+        state_2d = state_flat.reshape(self.numOfQuads, 17)
+        
+        # Initialize output array
+        sdot_all = np.zeros((self.numOfQuads, 17))
+        
+        # Process each quad separately
+        sdot_all = self.state_dot(t, state_2d, cmd, wind)
+        
+        # Flatten the result for the integrator
+        return sdot_all.T.flatten()
+
     def state_dot(self, t, state, cmd, wind):
 
         # Import Params
@@ -143,23 +170,23 @@ class QuadcopterSwarm:
     
         # Import State Vector
         # ---------------------------  
-        x      = state[0]
-        y      = state[1]
-        z      = state[2]
-        q0     = state[3]
-        q1     = state[4]
-        q2     = state[5]
-        q3     = state[6]
-        xdot   = state[7]
-        ydot   = state[8]
-        zdot   = state[9]
-        p      = state[10]
-        q      = state[11]
-        r      = state[12]
-        wM1    = state[13]
-        wM2    = state[14]
-        wM3    = state[15]
-        wM4    = state[16]
+        x      = state[:,0]
+        y      = state[:,1]
+        z      = state[:,2]
+        q0     = state[:,3]
+        q1     = state[:,4]
+        q2     = state[:,5]
+        q3     = state[:,6]
+        xdot   = state[:,7]
+        ydot   = state[:,8]
+        zdot   = state[:,9]
+        p      = state[:,10]
+        q      = state[:,11]
+        r      = state[:,12]
+        wM1    = state[:,13]
+        wM2    = state[:,14]
+        wM3    = state[:,15]
+        wM4    = state[:,16]
 
         # Motor Dynamics and Rotor forces (Second Order System: https://apmonitor.com/pdc/index.php/Main/SecondOrderSystems)
         # ---------------------------
@@ -229,7 +256,7 @@ class QuadcopterSwarm:
     
         # State Derivative Vector
         # ---------------------------
-        sdot     = np.zeros([17])
+        sdot     = np.zeros([17,self.numOfQuads])
         sdot[0]  = DynamicsDot[0]
         sdot[1]  = DynamicsDot[1]
         sdot[2]  = DynamicsDot[2]
@@ -248,7 +275,8 @@ class QuadcopterSwarm:
         sdot[15] = wdotM3
         sdot[16] = wdotM4
 
-        self.acc = sdot[7:10]
+        # Note: self.acc is updated per-quad in the update() method
+        # Don't update it here since state_dot handles a single quad
 
         return sdot
 
@@ -257,12 +285,13 @@ class QuadcopterSwarm:
         if wind is None:
             wind = Wind()
 
-
         prev_vel   = self.vel
         prev_omega = self.omega
 
         self.integrator.set_f_params(cmd, wind)
-        self.state = self.integrator.integrate(t, t+Ts)
+        self.integratorState = self.integrator.integrate(t, t+Ts)
+        # Reshape flattened state back to (numOfQuads, 17)
+        self.state = self.integratorState.reshape(self.numOfQuads, 17)
 
         self.pos   = self.state[:,0:3]
         self.quat  = self.state[:,3:7]
@@ -272,6 +301,7 @@ class QuadcopterSwarm:
 
         self.vel_dot = (self.vel - prev_vel)/Ts
         self.omega_dot = (self.omega - prev_omega)/Ts
+        self.acc = self.vel_dot  # Acceleration is the derivative of velocity
 
         self.extended_state()
         self.forces()
