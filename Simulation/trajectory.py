@@ -112,14 +112,13 @@ class Trajectory:
                 raise Exception("Time array isn't properly ordered.")  
             
             if (t == 0):
-                self.t_idx = 0
-            elif (t >= self.t_wps[-1]):
-                self.t_idx = -1
+                self.desPos = self.wps[0:3,:]
+            elif (t >= self.t_wps[-1].max()):
+                self.desPos = self.wps[-3:,:]
             else:
-                self.t_idx = np.where(t <= self.t_wps)[0][0]# - 1
-            
-            self.desPos = self.wps[self.t_idx*3:self.t_idx*3+3,:]
-            pass                
+                # Use first column for waypoint timing (assuming all quads have same timing)
+                self.t_idx = np.where(t <= self.t_wps[:, 0])[0][0]  
+                self.desPos = self.wps[self.t_idx*3:self.t_idx*3+3,:]          
         
         def pos_waypoint_interp():
             
@@ -129,14 +128,13 @@ class Trajectory:
                 raise Exception("Time array isn't properly ordered.") 
 
             if (t == 0):
-                self.t_idx = 0
-                self.desPos = self.wps[0,:]
-            elif (t >= self.t_wps[-1]):
-                self.t_idx = -1
-                self.desPos = self.wps[-1,:]
+                self.desPos = self.wps[0:3,:]  # First waypoint: rows 0-2 (x, y, z)
+            elif (t >= self.t_wps[-1].max()):
+                self.desPos = self.wps[-3:,:]  # Last waypoint: last 3 rows (x, y, z)
             else:
-                self.t_idx = np.where(t <= self.t_wps)[0][0] - 1
-                scale = (t - self.t_wps[self.t_idx])/self.T_segment[self.t_idx]
+                # Use first column for waypoint timing (assuming all quads have same timing)
+                self.t_idx = np.where(t <= self.t_wps[:, 0])[0][0] - 1
+                scale = (t - self.t_wps[self.t_idx, 0])/self.T_segment[self.t_idx, 0]
                 self.desPos = (1 - scale) * self.wps[self.t_idx,:] + scale * self.wps[self.t_idx + 1,:]
             pass                
         
@@ -152,17 +150,16 @@ class Trajectory:
 
             # Hover at t=0
             if t == 0:
-                self.t_idx = 0
-                self.desPos = self.wps[0,:]
+                self.desPos = self.wps[0:3,:]  # First waypoint: rows 0-2 (x, y, z)
             # Stay hover at the last waypoint position
-            elif (t >= self.t_wps[-1]):
-                self.t_idx = -1
-                self.desPos = self.wps[-1,:]
+            elif (t >= self.t_wps[-1].max()):
+                self.desPos = self.wps[-3:,:]  # Last waypoint: last 3 rows (x, y, z)
             else:
-                self.t_idx = np.where(t <= self.t_wps)[0][0] - 1
+                # Use first column for waypoint timing (assuming all quads have same timing)
+                self.t_idx = np.where(t <= self.t_wps[:, 0])[0][0] - 1
                 
                 # Scaled time (between 0 and duration of segment)
-                scale = (t - self.t_wps[self.t_idx])
+                scale = (t - self.t_wps[self.t_idx, 0])
                 
                 # Which coefficients to use
                 start = nb_coeff * self.t_idx
@@ -196,7 +193,7 @@ class Trajectory:
             self.desPos = self.wps[self.t_idx,:]
             pass                
         
-        def pos_waypoint_arrived_wait():
+        def pos_waypoint_arrived_wait(quads):
 
             dist_consider_arrived = 0.2     # Distance to waypoint that is considered as "arrived"
             if (t == 0):
@@ -207,7 +204,7 @@ class Trajectory:
             
             # If end is not reached, calculate distance to next waypoint
             elif not(self.end_reached):     
-                distance_to_next_wp = ((self.wps[self.t_idx,0]-quad.pos[0])**2 + (self.wps[self.t_idx,1]-quad.pos[1])**2 + (self.wps[self.t_idx,2]-quad.pos[2])**2)**(0.5)
+                distance_to_next_wp = ((self.wps[self.t_idx,0]-quads.pos[0])**2 + (self.wps[self.t_idx,1]-quads.pos[1])**2 + (self.wps[self.t_idx,2]-quads.pos[2])**2)**(0.5)
                 
                 # If waypoint distance is below a threshold, specify the arrival time and confirm arrival
                 if (distance_to_next_wp < dist_consider_arrived) and not self.arrived:
@@ -215,8 +212,8 @@ class Trajectory:
                     self.arrived = True
 
                 # If arrived for more than xx seconds, increment waypoint index (t_idx)
-                # Replace 'self.t_wps[self.t_idx]' by any number to have a fixed waiting time for all waypoints
-                elif self.arrived and (t-self.t_arrived > self.t_wps[self.t_idx]):   
+                # Replace 'self.t_wps[self.t_idx, 0]' by any number to have a fixed waiting time for all waypoints
+                elif self.arrived and (t-self.t_arrived > self.t_wps[self.t_idx, 0]):   
                     self.t_idx += 1
                     self.arrived = False
 
@@ -241,10 +238,10 @@ class Trajectory:
             if not (len(self.t_wps) == len(self.y_wps)):
                 raise Exception("Time array and waypoint array not the same size.")
 
-            if (t == 0) or (t >= self.t_wps[-1]):
+            if (t == 0) or (t >= self.t_wps[-1].max()):
                 self.desEul[2] = self.y_wps[self.t_idx]
             else:
-                scale = (t - self.t_wps[self.t_idx])/self.T_segment[self.t_idx]
+                scale = (t - self.t_wps[self.t_idx, 0])/self.T_segment[self.t_idx, 0]
                 self.desEul[2] = (1 - scale)*self.y_wps[self.t_idx] + scale*self.y_wps[self.t_idx + 1]
                 
                 # Angle between current vector with the next heading vector
@@ -279,7 +276,7 @@ class Trajectory:
                         self.desEul[2] = self.prevDesYaw
 
             else:
-                if (t == 0) or (t >= self.t_wps[-1]):
+                if (t == 0) or (t >= self.t_wps[-1].max()):
                     self.desEul[2] = self.y_wps[self.t_idx]
                 else:
                     # Calculate desired Yaw

@@ -21,20 +21,20 @@ from load_ulg import load_ulg
 from pyulog.core import ULog
 
 
-def quad_sim(t, Ts, quad, ctrl, wind, traj):
+def quad_sim(t, Ts, quads, ctrl, wind, traj):
     
     # Dynamics (using last timestep's commands)
     # ---------------------------
-    quad.update(t, Ts, ctrl.w_cmd, wind)
+    quads.update(t, Ts, ctrl.w_cmd, wind)
     t += Ts
 
     # Trajectory for Desired States 
     # ---------------------------
-    sDes = traj.desiredState(t, Ts, quad)        
+    sDes = traj.desiredState(t, Ts, quads)        
 
     # Generate Commands (for next iteration)
     # ---------------------------
-    ctrl.controller(traj=traj, quad=quad, Ts=Ts)
+    ctrl.controller(traj=traj, quads=quads, Ts=Ts)
 
     return t
     
@@ -43,15 +43,15 @@ def getStartOffboardInds(timestamp, data):
     return offboard_inds[0]
 
 def main():
-    numOfQuads = 4
+    numOfQuads = 2
     Ti = 0
     Ts = 0.002
-    Tf = 50
+    Tf = 10
     quads = QuadcopterSwarm(Ti, numOfQuads)
-    quads.setQuadPos(np.array([0, 0, 0]), 0)
-    quads.setQuadPos(np.array([1, 0, 0]), 1)
-    quads.setQuadPos(np.array([0, 1, 0]), 2)
-    quads.setQuadPos(np.array([0, 0, 1]), 3)
+    # quads.setQuadPos(np.array([0, 0, 0]), 0)
+    # quads.setQuadPos(np.array([1, 0, 0]), 1)
+    # quads.setQuadPos(np.array([0, 1, 0]), 2)
+    # quads.setQuadPos(np.array([0, 0, 1]), 3)
     start_time = time.time()
 
     # Simulation Setup
@@ -101,32 +101,32 @@ def main():
     numTimeStep = int(Tf/Ts+1)
 
     t_all          = np.zeros(numTimeStep)
-    s_all          = np.zeros([numTimeStep, len(quads.state)])
-    pos_all        = np.zeros([numTimeStep, len(quads.pos)])
-    vel_all        = np.zeros([numTimeStep, len(quads.vel)])
-    quat_all       = np.zeros([numTimeStep, len(quads.quat)])
-    omega_all      = np.zeros([numTimeStep, len(quads.omega)])
-    euler_all      = np.zeros([numTimeStep, len(quads.euler)])
-    sDes_traj_all  = np.zeros([numTimeStep, len(traj.sDes)])
-    sDes_calc_all  = np.zeros([numTimeStep, len(ctrl.sDesCalc)])
-    w_cmd_all      = np.zeros([numTimeStep, len(ctrl.w_cmd)])
-    wMotor_all     = np.zeros([numTimeStep, len(quads.wMotor)])
-    thr_all        = np.zeros([numTimeStep, len(quads.thr)])
-    tor_all        = np.zeros([numTimeStep, len(quads.tor)])
+    s_all          = np.zeros([numTimeStep, quads.state.shape[0], quads.state.shape[1]])
+    pos_all        = np.zeros([numTimeStep, quads.pos.shape[0], quads.pos.shape[1]])
+    vel_all        = np.zeros([numTimeStep, quads.vel.shape[0], quads.vel.shape[1]])
+    quat_all       = np.zeros([numTimeStep, quads.quat.shape[0], quads.quat.shape[1]])
+    omega_all      = np.zeros([numTimeStep, quads.omega.shape[0], quads.omega.shape[1]])
+    euler_all      = np.zeros([numTimeStep, quads.euler.shape[0], quads.euler.shape[1]])
+    sDes_traj_all  = np.zeros([numTimeStep, traj.sDes.shape[0], traj.sDes.shape[1]])
+    sDes_calc_all  = np.zeros([numTimeStep, ctrl.sDesCalc.shape[0], ctrl.sDesCalc.shape[1]])
+    w_cmd_all      = np.zeros([numTimeStep, ctrl.w_cmd.shape[0], ctrl.w_cmd.shape[1]])
+    wMotor_all     = np.zeros([numTimeStep, quads.wMotor.shape[0], quads.wMotor.shape[1]])
+    thr_all        = np.zeros([numTimeStep, quads.thr.shape[0], quads.thr.shape[1]])
+    tor_all        = np.zeros([numTimeStep, quads.tor.shape[0], quads.tor.shape[1]])
 
     t_all[0]            = Ti
-    s_all[0,:]          = quads.state
-    pos_all[0,:]        = quads.pos
-    vel_all[0,:]        = quads.vel
-    quat_all[0,:]       = quads.quat
-    omega_all[0,:]      = quads.omega
-    euler_all[0,:]      = quads.euler
-    sDes_traj_all[0,:]  = traj.sDes
-    sDes_calc_all[0,:]  = ctrl.sDesCalc
-    w_cmd_all[0,:]      = ctrl.w_cmd
-    wMotor_all[0,:]     = quads.wMotor
-    thr_all[0,:]        = quads.thr
-    tor_all[0,:]        = quads.tor
+    s_all[0]          = quads.state
+    pos_all[0]        = quads.pos
+    vel_all[0]        = quads.vel
+    quat_all[0]       = quads.quat
+    omega_all[0]      = quads.omega
+    euler_all[0]      = quads.euler
+    sDes_traj_all[0]  = traj.sDes
+    sDes_calc_all[0]  = ctrl.sDesCalc
+    w_cmd_all[0]      = ctrl.w_cmd
+    wMotor_all[0]     = quads.wMotor
+    thr_all[0]        = quads.thr
+    tor_all[0]        = quads.tor
 
     # Run Simulation
     # ---------------------------
@@ -140,18 +140,18 @@ def main():
         # print("{:.3f}".format(t))
         try:
             t_all[i]             = t
-            s_all[i,:]           = quads.state
-            pos_all[i,:]         = quads.pos
-            vel_all[i,:]         = quads.vel
-            quat_all[i,:]        = quads.quat
-            omega_all[i,:]       = quads.omega
-            euler_all[i,:]       = quads.euler
-            sDes_traj_all[i,:]   = traj.sDes
-            sDes_calc_all[i,:]   = ctrl.sDesCalc
-            w_cmd_all[i,:]       = ctrl.w_cmd
-            wMotor_all[i,:]      = quads.wMotor
-            thr_all[i,:]         = quads.thr
-            tor_all[i,:]         = quads.tor
+            s_all[i]           = quads.state
+            pos_all[i]         = quads.pos
+            vel_all[i]         = quads.vel
+            quat_all[i]        = quads.quat
+            omega_all[i]       = quads.omega
+            euler_all[i]       = quads.euler
+            sDes_traj_all[i]   = traj.sDes
+            sDes_calc_all[i]   = ctrl.sDesCalc
+            w_cmd_all[i]       = ctrl.w_cmd
+            wMotor_all[i]      = quads.wMotor.T
+            thr_all[i]         = quads.thr.T
+            tor_all[i]         = quads.tor.T
         except:
             break
         i += 1

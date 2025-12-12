@@ -264,11 +264,11 @@ class QuadcopterSwarm:
         self.integrator.set_f_params(cmd, wind)
         self.state = self.integrator.integrate(t, t+Ts)
 
-        self.pos   = self.state[0:3]
-        self.quat  = self.state[3:7]
-        self.vel   = self.state[7:10]
-        self.omega = self.state[10:13]
-        self.wMotor = np.array([self.state[13], self.state[14], self.state[15], self.state[16]])
+        self.pos   = self.state[:,0:3]
+        self.quat  = self.state[:,3:7]
+        self.vel   = self.state[:,7:10]
+        self.omega = self.state[:,10:13]
+        self.wMotor = self.state[:,13:17]
 
         self.vel_dot = (self.vel - prev_vel)/Ts
         self.omega_dot = (self.omega - prev_omega)/Ts
