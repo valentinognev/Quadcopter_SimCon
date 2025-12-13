@@ -112,20 +112,7 @@ def getStartOffboardInds(timestamp, data):
 def main():
     start_time = time.time()
     if LOAD_ULG_DATA:
-    #    ulgData = load_ulg("/home/valentin/Projects/GambitonBiut/Recordings/CAT_SYS_IDENT/5blades1550/log_11_2025-12-1-14-00-38.ulg", 
-    #                     fields_to_extract=[['vehicle_local_position','vx'],['vehicle_local_position','vy'],
-    #                                     ['vehicle_local_position_setpoint','vx'],['vehicle_local_position_setpoint','vy']],
-    #                     startTime=8)
-    #     ulgData = load_ulg("/home/valentin/RL/TESTFLIGHTS/sininput.ulg", 
-    #                     fields_to_extract=[['vehicle_local_position','vx'],['vehicle_local_position','vy'],['vehicle_local_position','vz'],
-    #                                     ['vehicle_local_position_setpoint','vx'],['vehicle_local_position_setpoint','vy'],['vehicle_local_position_setpoint','vz'],
-    #                                     ['vehicle_attitude','roll'],['vehicle_attitude','pitch'],['vehicle_attitude','yaw'],
-    #                                     ['vehicle_attitude_setpoint','roll_body'],['vehicle_attitude_setpoint','pitch_body'],['vehicle_attitude_setpoint','yaw_body'],
-    #                                     ['vehicle_rates_setpoint','pitch'],['vehicle_rates_setpoint','roll'],['vehicle_rates_setpoint','yaw'],
-    #                                     ['vehicle_angular_velocity','xyz[0]'],['vehicle_angular_velocity','xyz[1]'],['vehicle_angular_velocity','xyz[2]'],
-    #                                     ['vehicle_thrust_setpoint','xyz[0]'],['vehicle_thrust_setpoint','xyz[1]'],['vehicle_thrust_setpoint','xyz[2]']],
-    #                     startTime=264, verbose=True)
-         ulgData = load_ulg("/home/valentin/RL/TESTFLIGHTS/RLCat2_3blades/pidCircle.ulg", 
+        ulgData = load_ulg("/home/valentin/RL/TESTFLIGHTS/RLCat2_3blades/PIDcontrolCircle/severalCircles_light.ulg", 
                         fields_to_extract=[['vehicle_local_position','vx'],['vehicle_local_position','vy'],['vehicle_local_position','vz'],
                                         ['vehicle_local_position_setpoint','vx'],['vehicle_local_position_setpoint','vy'],['vehicle_local_position_setpoint','vz'],
                                         ['vehicle_attitude','roll'],['vehicle_attitude','pitch'],['vehicle_attitude','yaw'],
@@ -134,8 +121,8 @@ def main():
                                         ['vehicle_angular_velocity','xyz[0]'],['vehicle_angular_velocity','xyz[1]'],['vehicle_angular_velocity','xyz[2]'],
                                         ['vehicle_thrust_setpoint','xyz[0]'],['vehicle_thrust_setpoint','xyz[1]'],['vehicle_thrust_setpoint','xyz[2]'],
                                         ['vehicle_control_mode','flag_control_offboard_enabled']],
-                        startTime=264+65, verbose=True)
-        #  ulgData = load_ulg("/home/valentin/RL/TESTFLIGHTS/RLCat1_5blades/pidWithCircle.ulg", 
+                        startTime=336, verbose=True)
+        # ulgData = load_ulg("/home/valentin/RL/TESTFLIGHTS/RLCat2_3blades/PIDcontrolCircle/severalCircles_heavy.ulg", 
         #                 fields_to_extract=[['vehicle_local_position','vx'],['vehicle_local_position','vy'],['vehicle_local_position','vz'],
         #                                 ['vehicle_local_position_setpoint','vx'],['vehicle_local_position_setpoint','vy'],['vehicle_local_position_setpoint','vz'],
         #                                 ['vehicle_attitude','roll'],['vehicle_attitude','pitch'],['vehicle_attitude','yaw'],
@@ -144,11 +131,11 @@ def main():
         #                                 ['vehicle_angular_velocity','xyz[0]'],['vehicle_angular_velocity','xyz[1]'],['vehicle_angular_velocity','xyz[2]'],
         #                                 ['vehicle_thrust_setpoint','xyz[0]'],['vehicle_thrust_setpoint','xyz[1]'],['vehicle_thrust_setpoint','xyz[2]'],
         #                                 ['vehicle_control_mode','flag_control_offboard_enabled']],
-        #                 startTime=247+150, verbose=True)
-         offinds = getStartOffboardInds(ulgData['vehicle_control_mode_flag_control_offboard_enabled']['timestamp'], ulgData['vehicle_control_mode_flag_control_offboard_enabled']['data'])
-         offstartTime=ulgData['vehicle_control_mode_flag_control_offboard_enabled']['timestamp'][offinds]
-         Tf = ulgData['vehicle_control_mode_flag_control_offboard_enabled']['timestamp'][-10]
-         pass
+        #                 startTime=590, verbose=True)
+        offinds = getStartOffboardInds(ulgData['vehicle_control_mode_flag_control_offboard_enabled']['timestamp'], ulgData['vehicle_control_mode_flag_control_offboard_enabled']['data'])
+        offstartTime=ulgData['vehicle_control_mode_flag_control_offboard_enabled']['timestamp'][offinds]
+        Tf = 50+70 #ulgData['vehicle_control_mode_flag_control_offboard_enabled']['timestamp'][-10]
+        pass
     else:
         ulgData = None
         Tf=None
