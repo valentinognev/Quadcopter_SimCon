@@ -47,7 +47,7 @@ def sys_params():
 
     params["Cd"]         = 0.0
     params["kTh"]        = 2.2e-6/4 # thrust coeff (N/(rad/s)^2) 
-    params["kTo"]        = params["kTh"]*0.06            # torque coeff (Nm/(rad/s)^2) 
+    params["kTo"]        = params["kTh"]*0.5            # torque coeff (Nm/(rad/s)^2) 
     params["HoverThr"]   = 0.25  # Thrust for hovering [%]
     params["mixerFM"]    = makeMixerFM(params) # Make mixer that calculated Thrust (F) and moments (M) as a function on motor speeds
     params["mixerFMinv"] = inv(params["mixerFM"])

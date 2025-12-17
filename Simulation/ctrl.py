@@ -95,8 +95,8 @@ Dp = 0.005*2*rateFactor
 Pq = Pp
 Dq = Dp 
 
-Pr = 1.0*0.25*1.2
-Dr = 0.1*0.25*1.2
+Pr = 3
+Dr = 0.019
 
 rate_P_gain = np.array([Pp, Pq, Pr])
 rate_D_gain = np.array([Dp, Dq, Dr])
@@ -115,9 +115,9 @@ saturateVel_separetely = False
 tiltMax = 50.0*deg2rad
 
 # Max Rate
-pMax = 200.0*deg2rad
-qMax = 200.0*deg2rad
-rMax = 150.0*deg2rad
+pMax = 2000.0*deg2rad
+qMax = 2000.0*deg2rad
+rMax = 1500.0*deg2rad
 
 rateMax = np.array([pMax, qMax, rMax])
 
@@ -154,7 +154,7 @@ class Control:
         self.thrust_sp[:] = traj.sDes[9:12]
         self.eul_sp[:]    = traj.sDes[12:15]
         self.pqr_sp[:]    = traj.sDes[15:18]
-        self.yawFF[:]     = traj.sDes[18]
+        self.yawFF[2]     = traj.sDes[18]
         
         # Select Controller
         # ---------------------------
@@ -391,7 +391,8 @@ class Control:
         self.yawFF = np.clip(self.yawFF, -rateMax[2], rateMax[2])
 
         # Add Yaw rate feed-forward
-        self.rate_sp += utils.quat2Dcm(utils.inverse(quad.quat))[:,2]*self.yawFF
+        # self.rate_sp += utils.quat2Dcm(utils.inverse(quad.quat))[:,2]*self.yawFF
+        self.rate_sp[2] += self.yawFF[2]
 
         # Limit rate setpoint
         self.rate_sp = np.clip(self.rate_sp, -rateMax, rateMax)
@@ -411,6 +412,6 @@ class Control:
         roll_pitch_gain = 0.5*(att_P_gain[0] + att_P_gain[1])
         self.yaw_w = np.clip(att_P_gain[2]/roll_pitch_gain, 0.0, 1.0)
 
-        att_P_gain[2] = roll_pitch_gain
+        # att_P_gain[2] = roll_pitch_gain
 
     

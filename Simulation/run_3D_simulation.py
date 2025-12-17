@@ -112,7 +112,7 @@ def getStartOffboardInds(timestamp, data):
 def main():
     start_time = time.time()
     if LOAD_ULG_DATA:
-        ulgData = load_ulg("/home/valentin/RL/TESTFLIGHTS/RLCat2_3blades/PIDcontrolCircle/severalCircles_light.ulg", 
+        ulgData = load_ulg("/home/valentin/RL/TESTFLIGHTS/RLCat2_3blades/RLFlights/yawOn/FastYawRate.ulg", 
                         fields_to_extract=[['vehicle_local_position','vx'],['vehicle_local_position','vy'],['vehicle_local_position','vz'],
                                         ['vehicle_local_position_setpoint','vx'],['vehicle_local_position_setpoint','vy'],['vehicle_local_position_setpoint','vz'],
                                         ['vehicle_attitude','roll'],['vehicle_attitude','pitch'],['vehicle_attitude','yaw'],
@@ -121,7 +121,17 @@ def main():
                                         ['vehicle_angular_velocity','xyz[0]'],['vehicle_angular_velocity','xyz[1]'],['vehicle_angular_velocity','xyz[2]'],
                                         ['vehicle_thrust_setpoint','xyz[0]'],['vehicle_thrust_setpoint','xyz[1]'],['vehicle_thrust_setpoint','xyz[2]'],
                                         ['vehicle_control_mode','flag_control_offboard_enabled']],
-                        startTime=336, verbose=True)
+                        startTime=396, verbose=True)
+        # ulgData = load_ulg("/home/valentin/RL/TESTFLIGHTS/RLCat2_3blades/PIDcontrolCircle/severalCircles_light.ulg", 
+        #                 fields_to_extract=[['vehicle_local_position','vx'],['vehicle_local_position','vy'],['vehicle_local_position','vz'],
+        #                                 ['vehicle_local_position_setpoint','vx'],['vehicle_local_position_setpoint','vy'],['vehicle_local_position_setpoint','vz'],
+        #                                 ['vehicle_attitude','roll'],['vehicle_attitude','pitch'],['vehicle_attitude','yaw'],
+        #                                 ['vehicle_attitude_setpoint','roll_body'],['vehicle_attitude_setpoint','pitch_body'],['vehicle_attitude_setpoint','yaw_body'],
+        #                                 ['vehicle_rates_setpoint','pitch'],['vehicle_rates_setpoint','roll'],['vehicle_rates_setpoint','yaw'],
+        #                                 ['vehicle_angular_velocity','xyz[0]'],['vehicle_angular_velocity','xyz[1]'],['vehicle_angular_velocity','xyz[2]'],
+        #                                 ['vehicle_thrust_setpoint','xyz[0]'],['vehicle_thrust_setpoint','xyz[1]'],['vehicle_thrust_setpoint','xyz[2]'],
+        #                                 ['vehicle_control_mode','flag_control_offboard_enabled']],
+        #                 startTime=336, verbose=True)
         # ulgData = load_ulg("/home/valentin/RL/TESTFLIGHTS/RLCat2_3blades/PIDcontrolCircle/severalCircles_heavy.ulg", 
         #                 fields_to_extract=[['vehicle_local_position','vx'],['vehicle_local_position','vy'],['vehicle_local_position','vz'],
         #                                 ['vehicle_local_position_setpoint','vx'],['vehicle_local_position_setpoint','vy'],['vehicle_local_position_setpoint','vz'],
@@ -134,7 +144,10 @@ def main():
         #                 startTime=590, verbose=True)
         offinds = getStartOffboardInds(ulgData['vehicle_control_mode_flag_control_offboard_enabled']['timestamp'], ulgData['vehicle_control_mode_flag_control_offboard_enabled']['data'])
         offstartTime=ulgData['vehicle_control_mode_flag_control_offboard_enabled']['timestamp'][offinds]
-        Tf = 50+70 #ulgData['vehicle_control_mode_flag_control_offboard_enabled']['timestamp'][-10]
+        Tf = 50 #ulgData['vehicle_control_mode_flag_control_offboard_enabled']['timestamp'][-10]
+        # plt.plot(ulgData['vehicle_rates_setpoint_yaw']['timestamp'], ulgData['vehicle_rates_setpoint_yaw']['data'])
+        # plt.plot(ulgData['vehicle_angular_velocity_xyz[2]']['timestamp'], ulgData['vehicle_angular_velocity_xyz[2]']['data'])
+        # plt.show()
         pass
     else:
         ulgData = None
@@ -250,7 +263,7 @@ def main():
     t = Ti
     i = 1
     while round(t,3) < Tf:
-        if t>8:
+        if t>3.2:
             pass
         t = quad_sim(t, Ts, quad, ctrl, wind, traj)
         

@@ -644,7 +644,7 @@ def testXYZposition(t):
     return sDes
 
 
-def testVelControl(t, ctlType: ControlType, ulgdata=None):
+def testVelControl(t, ctlType: ControlType, ulgData=None):
     desPos = np.array([0., 0., 0.])
     desVel = np.array([0., 0., 0.])
     desAcc = np.array([0., 0., 0.])
@@ -654,7 +654,7 @@ def testVelControl(t, ctlType: ControlType, ulgdata=None):
     desYawRate = 0.
 
     # Interpolate desired vx, vy and vz from ulgData setpoint fields if available
-    if ulgdata is None:
+    if ulgData is None:
         # Fallback to hardcoded values if ulgdata not provided
         if t >= 1 and t < 4:
             desVel = np.array([3, 2, 0])
@@ -662,24 +662,29 @@ def testVelControl(t, ctlType: ControlType, ulgdata=None):
             desVel = np.array([3, -1, 0])
     else:
         # Interpolate vx
-        vx_data = ulgdata['vehicle_local_position_setpoint_vx']
+        vx_data = ulgData['vehicle_local_position_setpoint_vx']
         timestamps = vx_data['timestamp']
         values = vx_data['data']
         desVel[0] = np.interp(t, timestamps, values, left=0.0, right=0.0)
         
         # Interpolate vy
-        vy_data = ulgdata['vehicle_local_position_setpoint_vy']
+        vy_data = ulgData['vehicle_local_position_setpoint_vy']
         timestamps = vy_data['timestamp']
         values = vy_data['data']
         desVel[1] = np.interp(t, timestamps, values, left=0.0, right=0.0)
         
         # Interpolate vz
         if ctlType == ControlType.XYZ_VEL:
-            vz_data = ulgdata['vehicle_local_position_setpoint_vz']
+            vz_data = ulgData['vehicle_local_position_setpoint_vz']
             timestamps = vz_data['timestamp']
             values = vz_data['data']
             desVel[2] = np.interp(t, timestamps, values, left=0.0, right=0.0)
      
+        yaw_rate_data = ulgData['vehicle_rates_setpoint_yaw']
+        timestamps = yaw_rate_data['timestamp']
+        values = yaw_rate_data['data']
+        desYawRate = np.interp(t, timestamps, values, left=0.0, right=0.0)
+        
     sDes = np.hstack((desPos, desVel, desAcc, desThr, desEul, desPQR, desYawRate)).astype(float)
     
     return sDes

@@ -111,7 +111,7 @@ def makeFigures(params, time, pos_all, vel_all, quat_all, omega_all, euler_all, 
     
     plt.show()
 
-    plt.figure()
+    plt.figure(1)
     plt.suptitle('Position: Simulated vs Setpoint')
     
     # X position
@@ -144,7 +144,7 @@ def makeFigures(params, time, pos_all, vel_all, quat_all, omega_all, euler_all, 
 
 
 
-    plt.figure()
+    plt.figure(2)
     plt.suptitle('Velocity: Simulated vs Setpoint')
     
     # Vx velocity
@@ -190,7 +190,7 @@ def makeFigures(params, time, pos_all, vel_all, quat_all, omega_all, euler_all, 
     plt.ylabel('Vz (m/s)')
     plt.draw()
 
-    plt.figure()
+    plt.figure(3)
     plt.plot(time, x_thr_sp, time, y_thr_sp, time, z_thr_sp)
     plt.grid(True)
     plt.legend(['x_thr_sp','y_thr_sp','z_thr_sp'])
@@ -200,7 +200,7 @@ def makeFigures(params, time, pos_all, vel_all, quat_all, omega_all, euler_all, 
 
 
     # attitude plot
-    plt.figure()
+    plt.figure(4)
     plt.suptitle('Euler Angles: Simulated vs Setpoint')
     
     # Roll
@@ -244,7 +244,7 @@ def makeFigures(params, time, pos_all, vel_all, quat_all, omega_all, euler_all, 
     plt.draw()
     
     # angular rates plot
-    plt.figure()
+    plt.figure(5)
     plt.suptitle('Angular Rates: Simulated vs Setpoint')
     
     # Roll rate (p)
@@ -255,6 +255,7 @@ def makeFigures(params, time, pos_all, vel_all, quat_all, omega_all, euler_all, 
     if ulgData is not None and 'vehicle_angular_velocity_xyz[0]' in ulgData:
         p_ulg = ulgData['vehicle_angular_velocity_xyz[0]']
         plt.plot(p_ulg['timestamp'], p_ulg['data'] * rad2deg, '-.', label='Roll Rate (p) - ulg', linewidth=2, alpha=0.7)
+        plt.plot(ulgData['vehicle_rates_setpoint_roll']['timestamp'], ulgData['vehicle_rates_setpoint_roll']['data'] * rad2deg, ':', label='Roll Rate (p) - setpoint traj', linewidth=2)
     plt.grid(True)
     plt.legend()
     plt.xlabel('Time (s)')
@@ -268,6 +269,7 @@ def makeFigures(params, time, pos_all, vel_all, quat_all, omega_all, euler_all, 
     if ulgData is not None and 'vehicle_angular_velocity_xyz[1]' in ulgData:
         q_ulg = ulgData['vehicle_angular_velocity_xyz[1]']
         plt.plot(q_ulg['timestamp'], q_ulg['data'] * rad2deg, '-.', label='Pitch Rate (q) - ulg', linewidth=2, alpha=0.7)
+        plt.plot(ulgData['vehicle_rates_setpoint_pitch']['timestamp'], ulgData['vehicle_rates_setpoint_pitch']['data'] * rad2deg, ':', label='Pitch Rate (q) - setpoint traj', linewidth=2)
     plt.grid(True)
     plt.legend()
     plt.xlabel('Time (s)')
@@ -281,13 +283,14 @@ def makeFigures(params, time, pos_all, vel_all, quat_all, omega_all, euler_all, 
     if ulgData is not None and 'vehicle_angular_velocity_xyz[2]' in ulgData:
         r_ulg = ulgData['vehicle_angular_velocity_xyz[2]']
         plt.plot(r_ulg['timestamp'], r_ulg['data'] * rad2deg, '-.', label='Yaw Rate (r) - ulg', linewidth=2, alpha=0.7)
+        plt.plot(ulgData['vehicle_rates_setpoint_yaw']['timestamp'], ulgData['vehicle_rates_setpoint_yaw']['data'] * rad2deg, ':', label='Yaw Rate (r) - setpoint traj', linewidth=2)
     plt.grid(True)
     plt.legend()
     plt.xlabel('Time (s)')
     plt.ylabel('Yaw Rate (°/s)')
     plt.draw()
 
-    plt.figure()
+    plt.figure(6)
     plt.plot(time, wM1, time, wM2, time, wM3, time, wM4)
     plt.plot(time, uM1, '--', time, uM2, '--', time, uM3, '--', time, uM4, '--')
     plt.grid(True)
@@ -296,7 +299,7 @@ def makeFigures(params, time, pos_all, vel_all, quat_all, omega_all, euler_all, 
     plt.ylabel('Motor Angular Velocity (RPM)')
     plt.draw()
 
-    plt.figure()
+    plt.figure(7)
     ax1 = plt.subplot(2,1,1)
     plt.plot(time, thrust[:,0], time, thrust[:,1], time, thrust[:,2], time, thrust[:,3])
     plt.grid(True)
@@ -313,7 +316,7 @@ def makeFigures(params, time, pos_all, vel_all, quat_all, omega_all, euler_all, 
     plt.ylabel('Rotor Torque (N*m)')
     plt.draw()
 
-    plt.figure()
+    plt.figure(8)
     ax1 = plt.subplot(3,1,1)
     plt.title('Trajectory Setpoints')
     plt.plot(time, x_tr, time, y_tr, time, z_tr)
@@ -337,7 +340,7 @@ def makeFigures(params, time, pos_all, vel_all, quat_all, omega_all, euler_all, 
     plt.ylabel('Acceleration (m/s^2)')
     plt.draw()
 
-    plt.figure()
+    plt.figure(9)
     plt.plot(time, x_err, time, y_err, time, z_err)
     plt.grid(True)
     plt.legend(['Pos x error','Pos y error','Pos z error'])
