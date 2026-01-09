@@ -48,17 +48,17 @@ class ControlType(Enum):
 
 # Position P gains
 Py    = 1.0*.7
-Px    = Py
+Px    = Py*.8
 Pz    = 1.0
 
 pos_P_gain = np.array([Px, Py, Pz])
 
 # Velocity P-D gains
-Pxdot = 3
-Dxdot = .25
+Pxdot = 2.3
+Dxdot = 0.2
 Ixdot = 0.2
 FFxdot = 0.0
-FFdxdot = 0.0
+FFdxdot = 0.05
 
 yfactor = 1
 Pydot = Pxdot*yfactor
@@ -67,9 +67,9 @@ Iydot = Ixdot*yfactor
 FFydot = FFxdot*yfactor
 FFdydot = FFdxdot*yfactor
 
-Pzdot = 4.0*6*6
-Dzdot = 0.5
-Izdot = 5.0
+Pzdot = 2.0
+Dzdot = 0.2
+Izdot = 0.0
 FFzdot = 0.0
 FFdzdot = 0.0
 
@@ -78,6 +78,9 @@ vel_D_gain = np.array([Dxdot, Dydot, Dzdot])
 vel_I_gain = np.array([Ixdot, Iydot, Izdot])
 vel_FF_gain = np.array([FFxdot, FFydot, FFzdot])
 vel_FF_dot_gain = np.array([FFdxdot, FFdydot, FFdzdot])
+
+# Low pass filter cutoff frequency for vel_sp_dot (Hz)
+vel_sp_dot_lpf_cutoff = 15.0
 
 # Attitude P gains
 Pphi = 10*2
@@ -143,6 +146,7 @@ class Control:
         self.qd = np.zeros(4)
         
         self.prevVel_sp = np.zeros(3)
+        self.vel_sp_dot_filtered = np.zeros(3)
     
     def controller(self, traj, quad, Ts):
 
@@ -268,6 +272,23 @@ class Control:
             if (totalVel_sp > velMaxAll):
                 self.vel_sp = self.vel_sp/totalVel_sp*velMaxAll
 
+    def low_pass_filter(self, raw_value, filtered_state, Ts, cutoff_freq):
+        """
+        First-order low pass filter
+        
+        Args:
+            raw_value: Current unfiltered value
+            filtered_state: Previous filtered state (will be updated)
+            Ts: Sampling time
+            cutoff_freq: Cutoff frequency in Hz
+            
+        Returns:
+            Filtered value
+        """
+        alpha = Ts * cutoff_freq / (1.0 + Ts * cutoff_freq)
+        filtered_state[:] = alpha * raw_value + (1.0 - alpha) * filtered_state
+        return filtered_state
+
 
     def z_vel_control(self, quad, Ts):
         
@@ -275,12 +296,16 @@ class Control:
         # ---------------------------
         # Hover thrust (m*g) is sent as a Feed-Forward term, in order to 
         # allow hover when the position and velocity error are nul
-        vel_sp_dot = (self.vel_sp - self.prevVel_sp)/Ts
+        vel_sp_dot_raw = (self.vel_sp - self.prevVel_sp)/Ts
+        # if quad.vel[2] < -0.05:
+        #     print("vel_sp_dot_raw: ", vel_sp_dot_raw)
+        # Low pass filter for vel_sp_dot
+        vel_sp_dot = self.low_pass_filter(vel_sp_dot_raw, self.vel_sp_dot_filtered, Ts, vel_sp_dot_lpf_cutoff)
         vel_z_error = self.vel_sp[2] - quad.vel[2]
         if (config.orient == "NED"):
             thrust_z_sp = vel_P_gain[2]*vel_z_error - vel_D_gain[2]*quad.vel_dot[2] + quad.params["mB"]*(self.acc_sp[2] - quad.params["g"]) + self.thr_int[2] + vel_FF_gain[2]*self.vel_sp[2] + vel_FF_dot_gain[2]*vel_sp_dot[2]
         elif (config.orient == "ENU"):
-            thrust_z_sp = vel_P_gain[2]*vel_z_error - vel_D_gain[2]*quad.vel_dot[2] + quad.params["mB"]*(self.acc_sp[2] + quad.params["g"]) + self.thr_int[2] + vel_FF_gain[2]*self.vel_sp[2] + vel_FF_dot_gain[2]*vel_sp_dot[2]
+            thrust_z_sp = vel_P_gain[2]*vel_z_error + vel_D_gain[2]*quad.vel_dot[2] + quad.params["mB"]*(self.acc_sp[2] + quad.params["g"]) + self.thr_int[2] + vel_FF_gain[2]*self.vel_sp[2] + vel_FF_dot_gain[2]*vel_sp_dot[2]
         
         # Get thrust limits
         if (config.orient == "NED"):
