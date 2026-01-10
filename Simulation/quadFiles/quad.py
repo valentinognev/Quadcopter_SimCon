@@ -57,6 +57,7 @@ class Quadcopter:
         self.vel_dot = np.zeros(3)
         self.omega_dot = np.zeros(3)
         self.acc = np.zeros(3)
+        self.globalTime = None
 
         self.extended_state()
         self.forces()
@@ -66,6 +67,9 @@ class Quadcopter:
         self.integrator = ode(self.state_dot).set_integrator('dopri5', first_step='0.00005', atol='1e-6', rtol='1e-6')
         self.integrator.set_initial_value(self.state, Ti)
 
+
+    def set_GlobalTime(self, globalTime):
+        self.globalTime = globalTime
 
     def extended_state(self):
 

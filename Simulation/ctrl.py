@@ -49,13 +49,13 @@ class ControlType(Enum):
 # Position P gains
 Py    = 1.0*.7
 Px    = Py*.8
-Pz    = 1.0
+Pz    = 3.0
 
 pos_P_gain = np.array([Px, Py, Pz])
 
 # Velocity P-D gains
-Pxdot = 2.3
-Dxdot = 0.2
+Pxdot = 1.9
+Dxdot = 0.05
 Ixdot = 0.2
 FFxdot = 0.0
 FFdxdot = 0.05
@@ -67,11 +67,11 @@ Iydot = Ixdot*yfactor
 FFydot = FFxdot*yfactor
 FFdydot = FFdxdot*yfactor
 
-Pzdot = 2.0
-Dzdot = 0.2
-Izdot = 0.0
+Pzdot = 8.0
+Dzdot = 0.5
+Izdot = 1.5
 FFzdot = 0.0
-FFdzdot = 0.0
+FFdzdot = 0.3
 
 vel_P_gain = np.array([Pxdot, Pydot, Pzdot])
 vel_D_gain = np.array([Dxdot, Dydot, Dzdot])
@@ -291,7 +291,6 @@ class Control:
 
 
     def z_vel_control(self, quad, Ts):
-        
         # Z Velocity Control (Thrust in D-direction)
         # ---------------------------
         # Hover thrust (m*g) is sent as a Feed-Forward term, in order to 
@@ -303,7 +302,9 @@ class Control:
         vel_sp_dot = self.low_pass_filter(vel_sp_dot_raw, self.vel_sp_dot_filtered, Ts, vel_sp_dot_lpf_cutoff)
         vel_z_error = self.vel_sp[2] - quad.vel[2]
         if (config.orient == "NED"):
-            thrust_z_sp = vel_P_gain[2]*vel_z_error - vel_D_gain[2]*quad.vel_dot[2] + quad.params["mB"]*(self.acc_sp[2] - quad.params["g"]) + self.thr_int[2] + vel_FF_gain[2]*self.vel_sp[2] + vel_FF_dot_gain[2]*vel_sp_dot[2]
+            thrust_z_sp = vel_P_gain[2]*vel_z_error -  vel_D_gain[2]*quad.vel_dot[2] + \
+                quad.params["mB"]*(self.acc_sp[2] - quad.params["g"]) + self.thr_int[2] + \
+                vel_FF_gain[2]*self.vel_sp[2] + vel_FF_dot_gain[2]*vel_sp_dot[2]
         elif (config.orient == "ENU"):
             thrust_z_sp = vel_P_gain[2]*vel_z_error + vel_D_gain[2]*quad.vel_dot[2] + quad.params["mB"]*(self.acc_sp[2] + quad.params["g"]) + self.thr_int[2] + vel_FF_gain[2]*self.vel_sp[2] + vel_FF_dot_gain[2]*vel_sp_dot[2]
         
@@ -320,6 +321,8 @@ class Control:
         stop_int_D = (thrust_z_sp >= uMax and vel_z_error >= 0.0) or (thrust_z_sp <= uMin and vel_z_error <= 0.0)
 
         # Calculate integral part
+        if quad.globalTime>=0.2:
+            pass
         if not (stop_int_D):
             self.thr_int[2] += vel_I_gain[2]*vel_z_error*Ts * quad.params["useIntergral"]
             # Limit thrust integral
