@@ -29,8 +29,7 @@ def fullprint(*args, **kwargs):
     np.set_printoptions(opt)
 
 
-def makeFigures(params, time, pos_all, vel_all, quat_all, omega_all, euler_all, commands, wMotor_all, thrust, 
-                torque, sDes_traj, sDes_calc, ulgData=None, reward_data=None, target_pos=None):
+def makeFigures(params, time, pos_all, vel_all, quat_all, omega_all, euler_all, commands, wMotor_all, thrust, torque, sDes_traj, sDes_calc, ulgData=None, reward_data=None, target_pos=None):
     x    = pos_all[:,0]
     y    = pos_all[:,1]
     z    = pos_all[:,2]
@@ -100,6 +99,32 @@ def makeFigures(params, time, pos_all, vel_all, quat_all, omega_all, euler_all, 
     x_err = x_sp - x
     y_err = y_sp - y
     z_err = z_sp - z
+    
+    # Calculate distance from target (2D distance in x-y plane only)
+    # Use target_pos if provided, otherwise use setpoint
+    if target_pos is not None:
+        # target_pos is a 2D tuple/array (x, y)
+        try:
+            target_x = float(target_pos[0])
+            target_y = float(target_pos[1])
+        except (TypeError, IndexError):
+            # If target_pos is not indexable, try to convert directly
+            target_x = float(target_pos) if not hasattr(target_pos, '__len__') else 0.0
+            target_y = 0.0
+        # Calculate distance from actual position to target
+        dist_from_target = np.sqrt((x - target_x)**2 + (y - target_y)**2)
+    else:
+        # Fall back to using setpoint if target_pos not provided
+        # Check if setpoint values are valid (not NaN)
+        if np.any(np.isnan(x_sp)) or np.any(np.isnan(y_sp)):
+            # If setpoints are NaN, try to use trajectory setpoint
+            if sDes_traj.shape[1] >= 2 and not np.any(np.isnan(x_tr)) and not np.any(np.isnan(y_tr)):
+                dist_from_target = np.sqrt((x - x_tr)**2 + (y - y_tr)**2)
+            else:
+                # If all else fails, use zeros (will show as flat line)
+                dist_from_target = np.zeros_like(time)
+        else:
+            dist_from_target = np.sqrt(x_err**2 + y_err**2)
 
     psiDes   = np.zeros(q0Des.shape[0])
     thetaDes = np.zeros(q0Des.shape[0])
@@ -116,7 +141,7 @@ def makeFigures(params, time, pos_all, vel_all, quat_all, omega_all, euler_all, 
     plt.suptitle('Position: Simulated vs Setpoint')
     
     # X position
-    ax1 = plt.subplot(3, 1, 1)
+    ax1 = plt.subplot(4, 1, 1)
     plt.plot(time, x, label='x (simulated)', linewidth=2)
     plt.plot(time, x_sp, '--', label='x (setpoint)', linewidth=2)
     plt.grid(True)
@@ -125,7 +150,7 @@ def makeFigures(params, time, pos_all, vel_all, quat_all, omega_all, euler_all, 
     plt.ylabel('X Position (m)')
     
     # Y position
-    ax2 = plt.subplot(3, 1, 2, sharex=ax1)
+    ax2 = plt.subplot(4, 1, 2, sharex=ax1)
     plt.plot(time, y, label='y (simulated)', linewidth=2)
     plt.plot(time, y_sp, '--', label='y (setpoint)', linewidth=2)
     plt.grid(True)
@@ -134,13 +159,22 @@ def makeFigures(params, time, pos_all, vel_all, quat_all, omega_all, euler_all, 
     plt.ylabel('Y Position (m)')
     
     # Z position
-    ax3 = plt.subplot(3, 1, 3, sharex=ax1)
+    ax3 = plt.subplot(4, 1, 3, sharex=ax1)
     plt.plot(time, z, label='z (simulated)', linewidth=2)
     plt.plot(time, z_sp, '--', label='z (setpoint)', linewidth=2)
     plt.grid(True)
     plt.legend()
     plt.xlabel('Time (s)')
     plt.ylabel('Z Position (m)')
+    
+    # Distance from target
+    ax4 = plt.subplot(4, 1, 4, sharex=ax1)
+    plt.plot(time, dist_from_target, label='Distance from Target', linewidth=2, color='red')
+    plt.axhline(y=0.1, color='green', linestyle='--', linewidth=2, label='Goal Threshold (0.1 m)')
+    plt.grid(True)
+    plt.legend()
+    plt.xlabel('Time (s)')
+    plt.ylabel('Distance (m)')
     plt.draw()
 
 
@@ -348,6 +382,42 @@ def makeFigures(params, time, pos_all, vel_all, quat_all, omega_all, euler_all, 
     plt.xlabel('Time (s)')
     plt.ylabel('Position Error (m)')
     plt.draw()
+
+    # Reward plot
+    if reward_data is not None and len(reward_data) > 0:
+        plt.figure(10)
+        plt.suptitle('Reward Over Time')
+        
+        # Ensure reward_data has the right shape
+        # Expected format: [reward] (single value per timestep)
+        if reward_data.ndim == 2 and reward_data.shape[1] >= 1:
+            reward_values = reward_data[:, 0]
+        elif reward_data.ndim == 1:
+            # If 1D array, use directly
+            reward_values = reward_data
+        else:
+            # If shape doesn't match, skip the reward plot
+            print(f"Warning: reward_data shape {reward_data.shape} doesn't match expected format. Skipping reward plot.")
+            return
+        
+        # Ensure time array matches reward_data length
+        if len(time) != len(reward_values):
+            # Truncate or pad to match
+            min_len = min(len(time), len(reward_values))
+            time_reward = time[:min_len]
+            reward_values = reward_values[:min_len]
+        else:
+            time_reward = time
+        
+        # Plot reward
+        ax1 = plt.subplot(1, 1, 1)
+        plt.plot(time_reward, reward_values, label='Reward (tan-based)', linewidth=2, color='blue')
+        plt.grid(True)
+        plt.legend()
+        plt.xlabel('Time (s)')
+        plt.ylabel('Reward Value')
+        plt.title('Reward Over Time')
+        plt.draw()
 
 
 def plotComparisonWithUlg(time, euler_all, omega_all, ulgData=None):
