@@ -29,7 +29,8 @@ def fullprint(*args, **kwargs):
     np.set_printoptions(opt)
 
 
-def makeFigures(params, time, pos_all, vel_all, quat_all, omega_all, euler_all, commands, wMotor_all, thrust, torque, sDes_traj, sDes_calc, ulgData=None):
+def makeFigures(params, time, pos_all, vel_all, quat_all, omega_all, euler_all, commands, wMotor_all, thrust, 
+                torque, sDes_traj, sDes_calc, ulgData=None, reward_data=None, target_pos=None):
     x    = pos_all[:,0]
     y    = pos_all[:,1]
     z    = pos_all[:,2]

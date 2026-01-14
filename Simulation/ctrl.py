@@ -83,7 +83,7 @@ vel_FF_dot_gain = np.array([FFdxdot, FFdydot, FFdzdot])
 vel_sp_dot_lpf_cutoff = 15.0
 
 # Attitude P gains
-Pphi = 10*2
+Pphi = 8
 Ptheta = Pphi
 Ppsi = 1.5
 PpsiStrong = 8
@@ -94,6 +94,8 @@ att_P_gain = np.array([Pphi, Ptheta, Ppsi])
 rateFactor = 0.5
 Pp = 0.4*rateFactor
 Dp = 0.005*2*rateFactor
+rate_FF_gain = 0.000*rateFactor
+rate_FF_dot_gain = 0.25
 
 Pq = Pp
 Dq = Dp 
@@ -321,8 +323,7 @@ class Control:
         stop_int_D = (thrust_z_sp >= uMax and vel_z_error >= 0.0) or (thrust_z_sp <= uMin and vel_z_error <= 0.0)
 
         # Calculate integral part
-        if quad.globalTime>=0.2:
-            pass
+
         if not (stop_int_D):
             self.thr_int[2] += vel_I_gain[2]*vel_z_error*Ts * quad.params["useIntergral"]
             # Limit thrust integral
@@ -413,7 +414,7 @@ class Control:
         self.qe = utils.quatMultiply(utils.inverse(quad.quat), self.qd)
 
         # Create rate setpoint from quaternion error
-        self.rate_sp = (2.0*np.sign(self.qe[0])*self.qe[1:4])*att_P_gain
+        self.rate_sp = (2.0*np.sign(self.qe[0])*self.qe[1:4])*att_P_gain + rate_FF_gain*self.qe[1:4] + rate_FF_dot_gain*quad.omega
         
         # Limit yawFF
         self.yawFF = np.clip(self.yawFF, -rateMax[2], rateMax[2])

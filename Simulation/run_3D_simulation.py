@@ -112,7 +112,7 @@ def getStartOffboardInds(timestamp, data):
 def main():
     start_time = time.time()
     if LOAD_ULG_DATA:
-        ulgData = load_ulg("/home/valentin/RL/TESTFLIGHTS/RLCat2_3blades/RLFlights/yawOn/FastYawRate.ulg", 
+        ulgData = load_ulg("/home/valentin/RL/TESTFLIGHTS/RLCat2_3blades/RLFlights/log_1_2026-1-12-12-01-42.ulg", 
                         fields_to_extract=[['vehicle_local_position','vx'],['vehicle_local_position','vy'],['vehicle_local_position','vz'],
                                         ['vehicle_local_position_setpoint','vx'],['vehicle_local_position_setpoint','vy'],['vehicle_local_position_setpoint','vz'],
                                         ['vehicle_attitude','roll'],['vehicle_attitude','pitch'],['vehicle_attitude','yaw'],
@@ -121,7 +121,7 @@ def main():
                                         ['vehicle_angular_velocity','xyz[0]'],['vehicle_angular_velocity','xyz[1]'],['vehicle_angular_velocity','xyz[2]'],
                                         ['vehicle_thrust_setpoint','xyz[0]'],['vehicle_thrust_setpoint','xyz[1]'],['vehicle_thrust_setpoint','xyz[2]'],
                                         ['vehicle_control_mode','flag_control_offboard_enabled']],
-                        startTime=396, verbose=True)
+                        startTime=277, verbose=True)
         # ulgData = load_ulg("/home/valentin/RL/TESTFLIGHTS/RLCat2_3blades/PIDcontrolCircle/severalCircles_light.ulg", 
         #                 fields_to_extract=[['vehicle_local_position','vx'],['vehicle_local_position','vy'],['vehicle_local_position','vz'],
         #                                 ['vehicle_local_position_setpoint','vx'],['vehicle_local_position_setpoint','vy'],['vehicle_local_position_setpoint','vz'],
