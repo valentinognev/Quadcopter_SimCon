@@ -46,7 +46,7 @@ def main():
     numOfQuads = 4
     Ti = 0
     Ts = 0.02
-    Tf = 10
+    Tf = 27
     quads = QuadcopterSwarm(numOfQuads=numOfQuads, Ti=Ti)
     quads.setInitialQuadPos(np.array([0, 0, 0]), 0)
     quads.setInitialQuadPos(np.array([10, 0, 0]), 1)
