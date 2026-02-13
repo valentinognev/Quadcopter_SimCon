@@ -40,10 +40,19 @@ class Trajectory:
         self.yawType = trajSelect[1]
         self.averVel = trajSelect[2]
 
-        self.t_wps, self.wps, self.y_wps, self.v_wp = makeWaypoints(self.numOfQuads)
+        # For external setpoint mode (xyzType=100), skip waypoint generation
+        if (self.xyzType == 100):
+            # No waypoints needed - positions will be injected externally via desired dict
+            self.t_wps = np.zeros((2, self.numOfQuads))
+            self.t_wps[1,:] = 1.0
+            self.wps = np.zeros((6, self.numOfQuads))
+            self.y_wps = np.zeros((2, self.numOfQuads))
+            self.v_wp = np.ones((1, self.numOfQuads))
+        else:
+            self.t_wps, self.wps, self.y_wps, self.v_wp = makeWaypoints(self.numOfQuads)
         self.end_reached = 0
 
-        if (self.ctrlType == ControlType.XYZ_POS):
+        if (self.ctrlType == ControlType.XYZ_POS and self.xyzType != 100):
             self.T_segment = np.diff(self.t_wps)
 
             if (self.averVel == 1):
@@ -332,6 +341,11 @@ class Trajectory:
             # Hover at [0, 0, 0]
             if (self.xyzType == 0):
                 pass 
+            # External position setpoint injection (from RL agent or external source)
+            elif (self.xyzType == 100 and desired is not None):
+                self.desPos = np.array(desired['pos'])  # shape (3, numOfQuads)
+                # desVel, desAcc, desThr, desEul, desPQR, desYawRate remain zeros
+                self.sDes = np.concatenate((self.desPos, self.desVel, self.desAcc, self.desThr, self.desEul, self.desPQR, self.desYawRate), axis=0).astype(float)
             # For simple testing
             elif (self.xyzType == 99):
                 self.sDes = testXYZposition(t)   
