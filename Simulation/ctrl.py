@@ -94,7 +94,9 @@ class Control:
         self.vel_FF_gain = np.array(cp["vel_FF_gain"], dtype=float)
         self.vel_FF_dot_gain = np.array(cp["vel_FF_dot_gain"], dtype=float)
         self.vel_sp_dot_lpf_cutoff = float(cp["vel_sp_dot_lpf_cutoff"])
-        self.att_P_gain = np.array(cp["att_P_gain"], dtype=float).copy()
+        # Attitude P gains (roll, pitch, yaw): exactly 3 elements for rate_sp broadcast in attitude_control
+        raw_att = np.atleast_1d(np.array(cp["att_P_gain"], dtype=float)).flatten()
+        self.att_P_gain = (raw_att[:3] if len(raw_att) >= 3 else np.resize(raw_att, 3)).copy()
         self.rate_P_gain = np.array(cp["rate_P_gain"], dtype=float)
         self.rate_D_gain = np.array(cp["rate_D_gain"], dtype=float)
         self.rate_FF_gain = float(cp["rate_FF_gain"])
@@ -302,8 +304,9 @@ class Control:
         # ---------------------------
         # Hover thrust (m*g) is sent as a Feed-Forward term, in order to 
         # allow hover when the position and velocity error are nul
+        vel_sp_dot = np.zeros((3, quads.numOfQuads))
         vel_sp_dot_raw = (self.vel_sp - self.prevVel_sp)/Ts
-        vel_sp_dot = self.low_pass_filter(vel_sp_dot_raw, self.vel_sp_dot_filtered, Ts, self.vel_sp_dot_lpf_cutoff)
+        vel_sp_dot[2,:] = self.low_pass_filter(vel_sp_dot_raw[2,:], self.vel_sp_dot_filtered[2,:], Ts, self.vel_sp_dot_lpf_cutoff)
         vel_z_error = self.vel_sp[2] - quads.vel.T[2]
         if (config.orient == "NED"):
             thrust_z_sp = self.vel_P_gain[2]*vel_z_error - self.vel_D_gain[2]*quads.vel_dot.T[2] + \
@@ -340,7 +343,9 @@ class Control:
         
         # XY Velocity Control (Thrust in NE-direction)
         # ---------------------------
-        vel_sp_dot = (self.vel_sp - self.prevVel_sp)/Ts
+        vel_sp_dot = np.zeros((3, quads.numOfQuads))
+        vel_sp_dot_raw = (self.vel_sp - self.prevVel_sp)/Ts
+        vel_sp_dot[0:2,:] = self.low_pass_filter(vel_sp_dot_raw[0:2,:], self.vel_sp_dot_filtered[0:2,:], Ts, self.vel_sp_dot_lpf_cutoff)
         vel_xy_error = self.vel_sp[0:2] - quads.vel.T[0:2]
         thrust_xy_sp = (np.outer(self.vel_P_gain[0:2], np.ones(quads.numOfQuads)))*vel_xy_error \
                      - (np.outer(self.vel_D_gain[0:2], np.ones(quads.numOfQuads)))*quads.vel_dot.T[0:2] \
@@ -444,8 +449,11 @@ class Control:
             # Resulting error quaternion
             self.qe[:, i] = utils.quatMultiply(utils.inverse(quads.quat[i, :]), self.qd[:, i])
 
-            # Create rate setpoint from quaternion error
-            self.rate_sp[:, i] = (2.0*np.sign(self.qe[0, i])*self.qe[1:4, i])*self.att_P_gain + self.rate_FF_gain*self.qe[1:4,i] + self.rate_FF_dot_gain*quads.omega.T[i]
+            # Create rate setpoint from quaternion error (all operands length-3 for roll/pitch/yaw)
+            qe_vec = np.ravel(self.qe[1:4, i])[:3]
+            att_gain = np.ravel(self.att_P_gain)[:3]
+            omega_i = np.ravel(quads.omega[i, :])[:3]  # omega is (numOfQuads, 3); row i = quad i's [p,q,r]
+            self.rate_sp[:, i] = (2.0*np.sign(self.qe[0, i])*qe_vec)*att_gain + self.rate_FF_gain*qe_vec + self.rate_FF_dot_gain*omega_i
             
             # Limit yawFF for this quad
             yawFF_i = np.clip(self.yawFF[i], -self.rateMax[2], self.rateMax[2])

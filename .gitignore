@@ -60,3 +60,4 @@ train_dir/**/git.diff
 train_dir/**/config.json
 .agent/**
 .cursor/**
+Simulation/logs/*

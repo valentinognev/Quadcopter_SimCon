@@ -32,7 +32,7 @@ SYSTEM_MANAGER_MISSION_CONFIG = os.path.join(_SIM_DIR, "..", "..", "system_manag
 
 # Set True to use system_manager as high-level controller (velocity + yaw_rate from sys_manager_step).
 # Requires system_manager at CatSwarm/system_manager/system_managerPY. Only first quad (index 0) is controlled.
-USE_SYSTEM_MANAGER = True  # Set True to use system_manager as high-level controller (1 quad, in-process).
+USE_SYSTEM_MANAGER = False  # Set True to use system_manager as high-level controller (1 quad, in-process).
 
 
 def quad_sim(t, Ts, quads, ctrl, wind, traj):
@@ -57,7 +57,7 @@ def quad_sim_system_manager(t, Ts, quads, ctrl, wind, traj, sys_manager, flight_
     """One simulation step with system_manager as high-level controller (desired vel + yaw_rate)."""
     # Build flight data from current quad state (quad index 0)
     flight_Data = flight_data_from_swarm(quads, 0, t)
-    msg = sys_manager.sys_manager_step(flight_Data=flight_Data, curTime=t, log_data=False)
+    msg = sys_manager.sys_manager_step(flight_Data=flight_Data, curTime=t, log_data=True)
 
     # Fallback if msg empty or missing keys
     if not msg or "velCmd" not in msg:
@@ -100,7 +100,7 @@ def main():
             print("Warning: could not load drone config ({}): {}. Using defaults.".format(DRONE_CONFIG_PATH, e))
 
     # When using system_manager, only first quad (index 0) is controlled; use 1 quad.
-    numOfQuads = 1 if USE_SYSTEM_MANAGER else 4
+    numOfQuads = 1 if USE_SYSTEM_MANAGER else 1
     Ti = 0
     Ts = 0.02
     Tf = 27
