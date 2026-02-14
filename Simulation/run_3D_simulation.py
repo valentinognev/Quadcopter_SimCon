@@ -32,7 +32,7 @@ SYSTEM_MANAGER_MISSION_CONFIG = os.path.join(_SIM_DIR, "..", "..", "system_manag
 
 # Set True to use system_manager as high-level controller (velocity + yaw_rate from sys_manager_step).
 # Requires system_manager at CatSwarm/system_manager/system_managerPY. Only first quad (index 0) is controlled.
-USE_SYSTEM_MANAGER = False  # Set True to use system_manager as high-level controller (1 quad, in-process).
+USE_SYSTEM_MANAGER = True  # Set True to use system_manager as high-level controller (1 quad, in-process).
 
 
 def quad_sim(t, Ts, quads, ctrl, wind, traj):
@@ -102,7 +102,7 @@ def main():
     # When using system_manager, only first quad (index 0) is controlled; use 1 quad.
     numOfQuads = 1 if USE_SYSTEM_MANAGER else 1
     Ti = 0
-    Ts = 0.02
+    Ts = 0.002
     Tf = 27
     quads = QuadcopterSwarm(numOfQuads=numOfQuads, Ti=Ti, params=drone_params)
     quads.setInitialQuadPos(np.array([0, 0, 0]), 0)
@@ -208,7 +208,7 @@ def main():
             desired = {"pos": [np.nan, np.nan, float(quads.pos[0, 2])], "vel": [0.0, 0.0, 0.0], "yaw_rate": 0.0}
         traj.desiredState(Ti, Ts, quads, desired=desired)
     else:
-        sDes = traj.desiredState(0, Ts, quads)
+        sDes = traj.desiredState(0, Ts, quads) 
     ctrl.controller(traj, quads, Ts)
     
     # Initialize Result Matrixes
