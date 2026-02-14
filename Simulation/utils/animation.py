@@ -23,6 +23,18 @@ except ImportError:
 numFrames = 8
 
 def sameAxisAnimation(t_all, waypoints, pos_all, quat_all, sDes_tr_all, Ts, params, xyzType, yawType, ifsave):
+    # Convert enum to int if needed (backward compatibility)
+    # Import here to avoid circular import
+    try:
+        from ..trajectory import PositionTrajectoryType, YawTrajectoryType
+    except ImportError:
+        from trajectory import PositionTrajectoryType, YawTrajectoryType
+    
+    if isinstance(xyzType, PositionTrajectoryType):
+        xyzType = xyzType.value
+    if isinstance(yawType, YawTrajectoryType):
+        yawType = yawType.value
+    
     numOfQuads = pos_all.shape[1]
     
     # Collect all position data for axis limits calculation

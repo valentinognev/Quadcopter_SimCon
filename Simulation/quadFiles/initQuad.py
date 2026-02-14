@@ -42,12 +42,12 @@ def sys_params():
     params["IB"]   = IB
     params["invI"] = inv(IB)
     params["IRzz"] = IRzz
-    params["useIntergral"] = bool(False)    # Include integral gains in linear velocity control
+    params["useIntergral"] = bool(True)    # Include integral gains in linear velocity control
     # params["interpYaw"] = bool(False)       # Interpolate Yaw setpoints in waypoint trajectory
 
     params["Cd"]         = 0.0
     params["kTh"]        = 2.2e-6/4 # thrust coeff (N/(rad/s)^2) 
-    params["kTo"]        = params["kTh"]*0.06            # torque coeff (Nm/(rad/s)^2) 
+    params["kTo"]        = params["kTh"]*0.5            # torque coeff (Nm/(rad/s)^2) 
     params["HoverThr"]   = 0.25  # Thrust for hovering [%]
     params["mixerFM"]    = makeMixerFM(params) # Make mixer that calculated Thrust (F) and moments (M) as a function on motor speeds
     params["mixerFMinv"] = inv(params["mixerFM"])

@@ -37,99 +37,91 @@ deg2rad = pi/180.0
 
 class ControlType(Enum):
     """Enumeration of available control types."""
-    XYZ_POS = 0      # Position control in x, y, z
-    XY_VEL_Z_POS = 1 # Velocity control in x, y, position control in z
-    XYZ_VEL = 2      # Velocity control in x, y, z
-    ATT = 3          # Attitude target mode: angles + thrust, rates calculated
-    ATT_RATE = 4     # Attitude rate target mode: rates + thrust, bypasses attitude_control
+    XYZ_POS = 0        # Position control in x, y, z
+    XY_VEL_Z_POS = 1   # Velocity control in x, y, position control in z
+    XYZ_VEL = 2        # Velocity control in x, y, z
+    ATT = 3            # Attitude target mode: angles + thrust, rates calculated
+    ATT_RATE = 4       # Attitude rate target mode: rates + thrust, bypasses attitude_control
+    SYSTEM_MANAGER = 5 # System manager mode: external controller mode
 
-# Set PID Gains and Max Values
+# Default PID Gains and Max Values (used when no control_params provided)
 # ---------------------------
-
-# Position P gains
-Py    = 1.0*.7
-Px    = Py
-Pz    = 1.0
-
-pos_P_gain = np.array([Px, Py, Pz])
-
-# Velocity P-D gains
-Pxdot = 1.5
-Dxdot = .25
-Ixdot = 0.1
-FFxdot = 0.0
-FFdxdot = 0.25
-
-yfactor = 0.7
-Pydot = Pxdot*yfactor
-Dydot = Dxdot*yfactor
-Iydot = Ixdot*yfactor
-FFydot = FFxdot*yfactor
-FFdydot = FFdxdot*yfactor
-
-Pzdot = 4.0*6*6
-Dzdot = 0.5
-Izdot = 5.0
-FFzdot = 0.0
-FFdzdot = 0.0
-
-vel_P_gain = np.array([Pxdot, Pydot, Pzdot])
-vel_D_gain = np.array([Dxdot, Dydot, Dzdot])
-vel_I_gain = np.array([Ixdot, Iydot, Izdot])
-vel_FF_gain = np.array([FFxdot, FFydot, FFzdot])
-vel_FF_dot_gain = np.array([FFdxdot, FFdydot, FFdzdot])
-
-# Attitude P gains
-Pphi = 10*2
-Ptheta = Pphi
-Ppsi = 1.5
-PpsiStrong = 8
-
-att_P_gain = np.array([Pphi, Ptheta, Ppsi])
-
-# Rate P-D gains
-rateFactor = 0.5
-Pp = 0.4*rateFactor
-Dp = 0.005*2*rateFactor
-
-Pq = Pp
-Dq = Dp 
-
-Pr = 1.0*0.25*1.2
-Dr = 0.1*0.25*1.2
-
-rate_P_gain = np.array([Pp, Pq, Pr])
-rate_D_gain = np.array([Dp, Dq, Dr])
-
-# Max Velocities
-uMax = 15.0
-vMax = 15.0
-wMax = 15.0
-
-velMax = np.array([uMax, vMax, wMax])
-velMaxAll = 15.0
-
-saturateVel_separetely = False
-
-# Max tilt
-tiltMax = 50.0*deg2rad
-
-# Max Rate
-pMax = 200.0*deg2rad
-qMax = 200.0*deg2rad
-rMax = 150.0*deg2rad
-
-rateMax = np.array([pMax, qMax, rMax])
+def _default_control_params():
+    Px, Py, Pz = 1.0*.7, 1.0*.7*.8, 3.0
+    pos_P_gain = np.array([Px, Py, Pz])
+    Pxdot, Dxdot, Ixdot = 1.9, 0.05, 0.2
+    Pydot, Dydot, Iydot = Pxdot, Dxdot, Ixdot
+    Pzdot, Dzdot, Izdot = 8.0, 0.5, 1.5
+    vel_P_gain = np.array([Pxdot, Pydot, Pzdot])
+    vel_D_gain = np.array([Dxdot, Dydot, Dzdot])
+    vel_I_gain = np.array([Ixdot, Iydot, Izdot])
+    vel_FF_gain = np.array([0.0, 0.0, 0.0])
+    vel_FF_dot_gain = np.array([0.05, 0.05, 0.3])
+    att_P_gain = np.array([8.0, 8.0, 1.5])
+    rateFactor = 0.5
+    rate_P_gain = np.array([0.4*rateFactor, 0.4*rateFactor, 3.0])
+    rate_D_gain = np.array([0.005*2*rateFactor, 0.005*2*rateFactor, 0.019])
+    return {
+        "pos_P_gain": pos_P_gain,
+        "vel_P_gain": vel_P_gain,
+        "vel_D_gain": vel_D_gain,
+        "vel_I_gain": vel_I_gain,
+        "vel_FF_gain": vel_FF_gain,
+        "vel_FF_dot_gain": vel_FF_dot_gain,
+        "vel_sp_dot_lpf_cutoff": 15.0,
+        "att_P_gain": att_P_gain,
+        "rate_P_gain": rate_P_gain,
+        "rate_D_gain": rate_D_gain,
+        "rate_FF_gain": 0.0,
+        "rate_FF_dot_gain": 0.25,
+        "velMax": np.array([15.0, 15.0, 15.0]),
+        "velMaxAll": 15.0,
+        "saturateVel_separetely": False,
+        "tiltMax": 50.0*deg2rad,
+        "rateMax": np.array([2000.0, 2000.0, 1500.0])*deg2rad,
+    }
 
 
 class Control:
     
-    def __init__(self, quad, yawType):
+    def __init__(self, quad, yawType, control_params=None):
+        cp = control_params if control_params is not None else _default_control_params()
+        # Copy gains/limits so we can mutate (e.g. att_P_gain in setYawWeight)
+        self.pos_P_gain = np.array(cp["pos_P_gain"], dtype=float)
+        self.vel_P_gain = np.array(cp["vel_P_gain"], dtype=float)
+        self.vel_D_gain = np.array(cp["vel_D_gain"], dtype=float)
+        self.vel_I_gain = np.array(cp["vel_I_gain"], dtype=float)
+        self.vel_FF_gain = np.array(cp["vel_FF_gain"], dtype=float)
+        self.vel_FF_dot_gain = np.array(cp["vel_FF_dot_gain"], dtype=float)
+        self.vel_sp_dot_lpf_cutoff = float(cp["vel_sp_dot_lpf_cutoff"])
+        self.att_P_gain = np.array(cp["att_P_gain"], dtype=float).copy()
+        self.rate_P_gain = np.array(cp["rate_P_gain"], dtype=float)
+        self.rate_D_gain = np.array(cp["rate_D_gain"], dtype=float)
+        self.rate_FF_gain = float(cp["rate_FF_gain"])
+        self.rate_FF_dot_gain = float(cp["rate_FF_dot_gain"])
+        self.velMax = np.array(cp["velMax"], dtype=float)
+        self.velMaxAll = float(cp["velMaxAll"])
+        self.saturateVel_separetely = bool(cp["saturateVel_separetely"])
+        self.tiltMax = float(cp["tiltMax"])
+        self.rateMax = np.array(cp["rateMax"], dtype=float)
+
         self.sDesCalc = np.zeros((16, quad.numOfQuads))
         self.w_cmd = np.ones((4, quad.numOfQuads))*quad.params["w_hover"]
         self.thr_int = np.zeros((3, quad.numOfQuads))
-        if (yawType == 0):
-            att_P_gain[2] = 0
+        # Convert yawType to enum if needed (accepts int or enum)
+        try:
+            from .trajectory import YawTrajectoryType
+        except ImportError:
+            from trajectory import YawTrajectoryType
+        
+        if isinstance(yawType, (int, float, np.integer)):
+            yaw_type_enum = YawTrajectoryType(int(yawType))
+        elif isinstance(yawType, YawTrajectoryType):
+            yaw_type_enum = yawType
+        else:
+            yaw_type_enum = YawTrajectoryType(int(yawType))
+        if (yaw_type_enum == YawTrajectoryType.NONE):
+            self.att_P_gain[2] = 0
         self.setYawWeight()
         self.pos_sp    = np.zeros((3, quad.numOfQuads))
         self.vel_sp    = np.zeros((3, quad.numOfQuads))
@@ -143,6 +135,7 @@ class Control:
         self.qd = np.zeros((4, quad.numOfQuads))
         
         self.prevVel_sp = np.zeros((3, quad.numOfQuads))
+        self.vel_sp_dot_filtered = np.zeros((3, quad.numOfQuads))
     
     def controller(self, traj, quads, Ts):
 
@@ -159,15 +152,25 @@ class Control:
         # Select Controller
         # ---------------------------
         if (traj.ctrlType == ControlType.XYZ_VEL):
-            self.saturateVel()
+            self.saturateVel(quads)
             self.z_vel_control(quads, Ts)
             self.xy_vel_control(quads, Ts)
             self.thrustToAttitude(quads, Ts)
             self.attitude_control(quads, Ts)
             self.rate_control(quads, Ts)
         elif (traj.ctrlType == ControlType.XY_VEL_Z_POS):
+            # Velocity in xy, position in z (desired state from trajectory).
             self.z_pos_control(quads, Ts)
-            self.saturateVel()
+            self.saturateVel(quads)
+            self.z_vel_control(quads, Ts)
+            self.xy_vel_control(quads, Ts)
+            self.thrustToAttitude(quads, Ts)
+            self.attitude_control(quads, Ts)
+            self.rate_control(quads, Ts)
+        elif (traj.ctrlType == ControlType.SYSTEM_MANAGER):
+            # Same pipeline as XY_VEL_Z_POS; desired state (vel, yaw_rate, z) comes from system_manager via traj.sDes.
+            self.z_pos_control(quads, Ts)
+            self.saturateVel(quads)
             self.z_vel_control(quads, Ts)
             self.xy_vel_control(quads, Ts)
             self.thrustToAttitude(quads, Ts)
@@ -215,7 +218,7 @@ class Control:
             self.rate_sp[:] = self.pqr_sp[:]
             
             # Limit rate setpoint
-            self.rate_sp = np.clip(self.rate_sp, -rateMax, rateMax)
+            self.rate_sp = np.clip(self.rate_sp, -self.rateMax, self.rateMax)
             
             # Use rate control directly (bypasses attitude_control)
             self.rate_control(quads, Ts)
@@ -248,7 +251,7 @@ class Control:
         # Z Position Control
         # --------------------------- 
         pos_z_error = self.pos_sp[2] - quads.pos.T[2]
-        self.vel_sp[2] += pos_P_gain[2]*pos_z_error
+        self.vel_sp[2] += self.pos_P_gain[2]*pos_z_error
         pass
     
     def xy_pos_control(self, quads, Ts):
@@ -256,7 +259,7 @@ class Control:
         # XY Position Control
         # --------------------------- 
         pos_xy_error = (self.pos_sp[0:2] - quads.pos.T[0:2])
-        self.vel_sp[0:2] += (np.outer(pos_P_gain[0:2], np.ones(quads.numOfQuads)))*pos_xy_error
+        self.vel_sp[0:2] += (np.outer(self.pos_P_gain[0:2], np.ones(quads.numOfQuads)))*pos_xy_error
         pass
         
     def saturateVel(self, quads):
@@ -264,17 +267,34 @@ class Control:
         # Saturate Velocity Setpoint
         # --------------------------- 
         # Either saturate each velocity axis separately, or total velocity (prefered)
-        if (saturateVel_separetely):
-            self.vel_sp = np.clip(self.vel_sp, -velMax, velMax)
+        if (self.saturateVel_separetely):
+            self.vel_sp = np.clip(self.vel_sp, -self.velMax, self.velMax)
         else:
             totalVel_sp = norm(self.vel_sp, axis=0)
-            exceeds_limit = totalVel_sp > velMaxAll
+            exceeds_limit = totalVel_sp > self.velMaxAll
             if exceeds_limit.any():
                 # Normalize velocity for quads that exceed the limit
                 # Divide by current magnitude and multiply by max allowed magnitude
-                scale_factor = np.where(exceeds_limit, velMaxAll / totalVel_sp, 1.0)
+                scale_factor = np.where(exceeds_limit, self.velMaxAll / totalVel_sp, 1.0)
                 self.vel_sp = self.vel_sp * scale_factor[np.newaxis, :]
         pass
+    
+    def low_pass_filter(self, raw_value, filtered_state, Ts, cutoff_freq):
+        """
+        First-order low pass filter
+        
+        Args:
+            raw_value: Current unfiltered value
+            filtered_state: Previous filtered state (will be updated)
+            Ts: Sampling time
+            cutoff_freq: Cutoff frequency in Hz
+            
+        Returns:
+            Filtered value
+        """
+        alpha = Ts * cutoff_freq / (1.0 + Ts * cutoff_freq)
+        filtered_state[:] = alpha * raw_value + (1.0 - alpha) * filtered_state
+        return filtered_state
 
     def z_vel_control(self, quads, Ts):
         
@@ -282,12 +302,15 @@ class Control:
         # ---------------------------
         # Hover thrust (m*g) is sent as a Feed-Forward term, in order to 
         # allow hover when the position and velocity error are nul
-        vel_sp_dot = (self.vel_sp - self.prevVel_sp)/Ts
+        vel_sp_dot_raw = (self.vel_sp - self.prevVel_sp)/Ts
+        vel_sp_dot = self.low_pass_filter(vel_sp_dot_raw, self.vel_sp_dot_filtered, Ts, self.vel_sp_dot_lpf_cutoff)
         vel_z_error = self.vel_sp[2] - quads.vel.T[2]
         if (config.orient == "NED"):
-            thrust_z_sp = vel_P_gain[2]*vel_z_error - vel_D_gain[2]*quads.vel_dot.T[2] + quads.params["mB"]*(self.acc_sp[2] - quads.params["g"]) + self.thr_int[2] + vel_FF_gain[2]*self.vel_sp[2] + vel_FF_dot_gain[2]*vel_sp_dot[2]
+            thrust_z_sp = self.vel_P_gain[2]*vel_z_error - self.vel_D_gain[2]*quads.vel_dot.T[2] + \
+                quads.params["mB"]*(self.acc_sp[2] - quads.params["g"]) + self.thr_int[2] + \
+                    self.vel_FF_gain[2]*self.vel_sp[2] + self.vel_FF_dot_gain[2]*vel_sp_dot[2]
         elif (config.orient == "ENU"):
-            thrust_z_sp = vel_P_gain[2]*vel_z_error - vel_D_gain[2]*quads.vel_dot.T[2] + quads.params["mB"]*(self.acc_sp[2] + quads.params["g"]) + self.thr_int[2] + vel_FF_gain[2]*self.vel_sp[2] + vel_FF_dot_gain[2]*vel_sp_dot[2]
+            thrust_z_sp = self.vel_P_gain[2]*vel_z_error - self.vel_D_gain[2]*quads.vel_dot.T[2] + quads.params["mB"]*(self.acc_sp[2] + quads.params["g"]) + self.thr_int[2] + self.vel_FF_gain[2]*self.vel_sp[2] + self.vel_FF_dot_gain[2]*vel_sp_dot[2]
         
         # Get thrust limits
         if (config.orient == "NED"):
@@ -305,7 +328,7 @@ class Control:
         # Only update integral for quads where anti-windup is not active
         update_int = ~stop_int_D
         if update_int.any():
-            self.thr_int[2][update_int] += vel_I_gain[2]*vel_z_error[update_int]*Ts * quads.params["useIntergral"]
+            self.thr_int[2][update_int] += self.vel_I_gain[2]*vel_z_error[update_int]*Ts * quads.params["useIntergral"]
             # Limit thrust integral
             self.thr_int[2][update_int] = np.clip(self.thr_int[2][update_int], -quads.params["maxThr"], quads.params["maxThr"])
 
@@ -319,14 +342,14 @@ class Control:
         # ---------------------------
         vel_sp_dot = (self.vel_sp - self.prevVel_sp)/Ts
         vel_xy_error = self.vel_sp[0:2] - quads.vel.T[0:2]
-        thrust_xy_sp = (np.outer(vel_P_gain[0:2], np.ones(quads.numOfQuads)))*vel_xy_error \
-                     - (np.outer(vel_D_gain[0:2], np.ones(quads.numOfQuads)))*quads.vel_dot.T[0:2] \
+        thrust_xy_sp = (np.outer(self.vel_P_gain[0:2], np.ones(quads.numOfQuads)))*vel_xy_error \
+                     - (np.outer(self.vel_D_gain[0:2], np.ones(quads.numOfQuads)))*quads.vel_dot.T[0:2] \
                      + quads.params["mB"]*(self.acc_sp[0:2]) + self.thr_int[0:2] \
-                     + (np.outer(vel_FF_gain[0:2], np.ones(quads.numOfQuads)))*self.vel_sp[0:2] \
-                     + (np.outer(vel_FF_dot_gain[0:2], np.ones(quads.numOfQuads)))*vel_sp_dot[0:2]
+                     + (np.outer(self.vel_FF_gain[0:2], np.ones(quads.numOfQuads)))*self.vel_sp[0:2] \
+                     + (np.outer(self.vel_FF_dot_gain[0:2], np.ones(quads.numOfQuads)))*vel_sp_dot[0:2]
 
         # Max allowed thrust in NE based on tilt and excess thrust
-        thrust_max_xy_tilt = abs(self.thrust_sp[2])*np.tan(tiltMax)
+        thrust_max_xy_tilt = abs(self.thrust_sp[2])*np.tan(self.tiltMax)
         thrust_max_xy = sqrt(quads.params["maxThr"]**2 - self.thrust_sp[2]**2)
         thrust_max_xy = np.min(np.array([thrust_max_xy, thrust_max_xy_tilt]), axis=0)
 
@@ -344,9 +367,9 @@ class Control:
         
         # Use tracking Anti-Windup for NE-direction: during saturation, the integrator is used to unsaturate the output
         # see Anti-Reset Windup for PID controllers, L.Rundqwist, 1990
-        arw_gain = 2.0/vel_P_gain[0:2]
+        arw_gain = 2.0/self.vel_P_gain[0:2]
         vel_err_lim = vel_xy_error - (thrust_xy_sp - self.thrust_sp[0:2])*np.outer(arw_gain, np.ones(quads.numOfQuads))
-        self.thr_int[0:2] += (np.outer(vel_I_gain[0:2], np.ones(quads.numOfQuads)))*vel_err_lim*Ts * quads.params["useIntergral"]
+        self.thr_int[0:2] += (np.outer(self.vel_I_gain[0:2], np.ones(quads.numOfQuads)))*vel_err_lim*Ts * quads.params["useIntergral"]
         pass
     
     def thrustToAttitude(self, quads, Ts):
@@ -422,10 +445,10 @@ class Control:
             self.qe[:, i] = utils.quatMultiply(utils.inverse(quads.quat[i, :]), self.qd[:, i])
 
             # Create rate setpoint from quaternion error
-            self.rate_sp[:, i] = (2.0*np.sign(self.qe[0, i])*self.qe[1:4, i])*att_P_gain
+            self.rate_sp[:, i] = (2.0*np.sign(self.qe[0, i])*self.qe[1:4, i])*self.att_P_gain + self.rate_FF_gain*self.qe[1:4,i] + self.rate_FF_dot_gain*quads.omega.T[i]
             
             # Limit yawFF for this quad
-            yawFF_i = np.clip(self.yawFF[i], -rateMax[2], rateMax[2])
+            yawFF_i = np.clip(self.yawFF[i], -self.rateMax[2], self.rateMax[2])
 
             # Add Yaw rate feed-forward
             dcm_inv = utils.quat2Dcm(utils.inverse(quads.quat[i, :]))
@@ -433,7 +456,7 @@ class Control:
 
             # Limit rate setpoint
             # rateMax is (3,), need to reshape to (3, 1) for broadcasting with (3, numOfQuads)
-            self.rate_sp[:, i] = np.clip(self.rate_sp[:, i], -rateMax, rateMax)
+            self.rate_sp[:, i] = np.clip(self.rate_sp[:, i], -self.rateMax, self.rateMax)
         pass
 
     def rate_control(self, quads, Ts):
@@ -441,15 +464,15 @@ class Control:
         # Rate Control
         # ---------------------------
         rate_error = self.rate_sp - quads.omega.T  # (3, numOfQuads)
-        self.rateCtrl = (np.outer(rate_P_gain, np.ones(quads.numOfQuads)))*rate_error - (np.outer(rate_D_gain, np.ones(quads.numOfQuads)))*quads.omega_dot.T     # Be sure it is right sign for the D part
+        self.rateCtrl = (np.outer(self.rate_P_gain, np.ones(quads.numOfQuads)))*rate_error - (np.outer(self.rate_D_gain, np.ones(quads.numOfQuads)))*quads.omega_dot.T     # Be sure it is right sign for the D part
         pass
         
 
     def setYawWeight(self):
         
         # Calculate weight of the Yaw control gain
-        roll_pitch_gain = 0.5*(att_P_gain[0] + att_P_gain[1])
-        self.yaw_w = np.clip(att_P_gain[2]/roll_pitch_gain, 0.0, 1.0)
+        roll_pitch_gain = 0.5*(self.att_P_gain[0] + self.att_P_gain[1])
+        self.yaw_w = np.clip(self.att_P_gain[2]/roll_pitch_gain, 0.0, 1.0)
 
-        att_P_gain[2] = roll_pitch_gain
+        self.att_P_gain[2] = roll_pitch_gain
         pass

@@ -30,22 +30,36 @@ deg2rad = pi/180.0
 
 class QuadcopterSwarm:
 
-    def __init__(self, numOfQuads, Ti=0):
-        
+    def __init__(self, numOfQuads, Ti=0, params=None):
+        """
+        Args:
+            numOfQuads: Number of quadcopters in the swarm.
+            Ti: Initial time.
+            params: Optional drone params dict (e.g. from load_drone_config).
+                    If None, uses sys_params() from initQuad.
+        """
         self.numOfQuads = numOfQuads
         self.Ti = Ti
-        # Quad Params
+        # Quad Params (from JSON config or default sys_params)
         # ---------------------------
-        self.params = sys_params()
-        
-        # Command for initial stable hover
-        # ---------------------------
-        ini_hover = init_cmd(self.params)
-        self.params["FF"] = ini_hover[0]         # Feed-Forward Command for Hover
-        self.params["w_hover"] = ini_hover[1]    # Motor Speed for Hover
-        self.params["thr_hover"] = ini_hover[2]  # Motor Thrust for Hover  
-        self.thr = np.ones(4)*ini_hover[2]
-        self.tor = np.ones(4)*ini_hover[3]
+        if params is not None:
+            self.params = dict(params)
+            if "w_hover" not in self.params:
+                ini_hover = init_cmd(self.params)
+                self.params["FF"] = ini_hover[0]
+                self.params["w_hover"] = ini_hover[1]
+                self.params["thr_hover"] = ini_hover[2]
+        else:
+            self.params = sys_params()
+            ini_hover = init_cmd(self.params)
+            self.params["FF"] = ini_hover[0]
+            self.params["w_hover"] = ini_hover[1]
+            self.params["thr_hover"] = ini_hover[2]
+
+        w_hover = self.params["w_hover"]
+        thr_hover = self.params["thr_hover"]
+        self.thr = np.ones(4) * thr_hover
+        self.tor = np.ones(4) * (self.params["kTo"] * w_hover * w_hover)
         
         self.psi = np.zeros(numOfQuads)
         self.theta = np.zeros(numOfQuads)

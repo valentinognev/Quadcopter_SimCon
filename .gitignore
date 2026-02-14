@@ -58,3 +58,5 @@ train_dir/**/*.log
 train_dir/**/sf_log.txt
 train_dir/**/git.diff
 train_dir/**/config.json
+.agent/**
+.cursor/**
