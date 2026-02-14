@@ -21,7 +21,7 @@ from load_ulg import load_ulg
 from pyulog.core import ULog
 
 
-LOAD_ULG_DATA = True
+LOAD_ULG_DATA = False
 
 # # Load rotor parameters from ULog file
 # def load_rotor_params_from_ulog(ulog_file):
@@ -187,7 +187,7 @@ def main():
     # --------------------------- 
     Ti = 0
     Ts = 0.002
-    Tf = Tf if Tf is not None else 50
+    Tf = Tf if Tf is not None else 10
     ifsave = 0
  
     # Choose trajectory settings
@@ -204,7 +204,7 @@ def main():
     #                                  7: minimum accel_stop        8: minimum jerk_stop        9: minimum snap_stop
     #                                 10: minimum jerk_full_stop   11: minimum snap_full_stop
     #                                 12: pos_waypoint_arrived     13: pos_waypoint_arrived_wait
-    trajSelect[0] = 1 if LOAD_ULG_DATA else 99        
+    trajSelect[0] = 1# if LOAD_ULG_DATA else 99        
     # Select Yaw Trajectory Type      (0: none                      1: yaw_waypoint_timed,      2: yaw_waypoint_interp     3: follow          4: zero)
     trajSelect[1] = 3           
     # Select if waypoint time is used, or if average speed is used to calculate waypoint time   (0: waypoint time,   1: average speed)
