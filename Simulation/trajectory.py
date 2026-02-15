@@ -155,28 +155,30 @@ class Trajectory:
     def _pos_waypoint_timed(self, t):
         if not (self.t_wps.shape[0] == self.wps[::3,:].shape[0]):
             raise Exception("Time array and waypoint array not the same size.")
-        elif (np.diff(self.t_wps, axis=0) <= 0).any():
+        t_time = self.t_wps[:, 0].flatten()
+        if (np.diff(t_time) <= 0).any():
             raise Exception("Time array isn't properly ordered.")
         if (t == 0):
             self.desPos = self.wps[0:3,:]
-        elif (t >= self.t_wps[-1].max()):
+        elif (t >= t_time[-1]):
             self.desPos = self.wps[-3:,:]
         else:
-            self.t_idx = np.where(t <= self.t_wps[:, 0])[0][0]
+            self.t_idx = np.where(t <= t_time)[0][0]
             self.desPos = self.wps[self.t_idx*3:self.t_idx*3+3,:]
 
     def _pos_waypoint_interp(self, t):
         if not (self.t_wps.shape[0] == self.wps[::3,:].shape[0]):
             raise Exception("Time array and waypoint array not the same size.")
-        elif (np.diff(self.t_wps) <= 0).any():
+        t_time = self.t_wps[:, 0].flatten()
+        if (np.diff(t_time) <= 0).any():
             raise Exception("Time array isn't properly ordered.")
         if (t == 0):
             self.desPos = self.wps[0:3,:]
-        elif (t >= self.t_wps[-1].max()):
+        elif (t >= self.t_wps[-1, 0]):
             self.desPos = self.wps[-3:,:]
         else:
-            self.t_idx = np.where(t <= self.t_wps[:, 0])[0][0] - 1
-            scale = (t - self.t_wps[self.t_idx, 0])/self.T_segment[self.t_idx, 0]
+            self.t_idx = np.where(t <= t_time)[0][0] - 1
+            scale = (t - self.t_wps[self.t_idx, 0]) / self.T_segment[self.t_idx, 0]
             # wps layout: rows 0..2=wp0 xyz, 3..5=wp1 xyz, ...
             self.desPos = (1 - scale) * self.wps[self.t_idx*3:self.t_idx*3+3, :] + scale * self.wps[(self.t_idx+1)*3:(self.t_idx+2)*3, :]
 

@@ -151,7 +151,7 @@ def main():
             print("Warning: could not load drone config ({}): {}. Using defaults.".format(DRONE_CONFIG_PATH, e))
 
     # When using system_manager, only first quad (index 0) is controlled; use 1 quad.
-    numOfQuads = 1 if USE_SYSTEM_MANAGER else 1
+    numOfQuads = 1 if USE_SYSTEM_MANAGER else 4
     Ti = 0
     Ts = 0.003
     Tf = 27

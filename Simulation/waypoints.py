@@ -21,8 +21,9 @@ def makeWaypoints(numOfQuads):
     
     v_average = 1
 
+    # Segment durations (s) between waypoints; must be > 0 so times are strictly increasing
     t_ini = 3
-    t = np.array([4, 0, 4, 0])
+    t_segments = np.array([4.0, 4.0, 4.0, 4.0])  # 4 segments for 5 waypoints, or use 5 segments for 6 waypoints
     
     wp_ini = np.array([0, 0, 0])
     # wp = np.array([[2, 0, 0]])
@@ -35,7 +36,13 @@ def makeWaypoints(numOfQuads):
     yaw_ini = 0    
     yaw = np.array([20, -90, 0, 0])
 
-    t = np.hstack((t_ini, t)).astype(float)
+    # Build cumulative waypoint times (strictly increasing) so trajectory checks pass
+    n_wp = wp.shape[0] + 1  # wp_ini + wp rows
+    if len(t_segments) >= n_wp - 1:
+        t_segments = t_segments[: n_wp - 1]
+    else:
+        t_segments = np.resize(t_segments, n_wp - 1)
+    t = np.concatenate(([float(t_ini)], t_ini + np.cumsum(t_segments))).astype(float)
     wp = np.vstack((wp_ini, wp)).astype(float)
     yaw = np.array([np.hstack((yaw_ini, yaw)).astype(float)*deg2rad])
     waypoints = np.outer(wp,np.ones(numOfQuads))
