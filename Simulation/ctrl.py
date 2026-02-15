@@ -47,18 +47,18 @@ class ControlType(Enum):
 # ---------------------------
 
 # Position P gains
-Py    = 1.0*.7
-Px    = Py*.8
-Pz    = 3.0
+Py    = 1.5
+Px    = Py
+Pz    = 1.3
 
 pos_P_gain = np.array([Px, Py, Pz])
 
 # Velocity P-D gains
-Pxdot = 1.9
-Dxdot = 0.05
+Pxdot = 7
+Dxdot = 0.7
 Ixdot = 0.2
-FFxdot = 0.0
-FFdxdot = 0.05
+FFxdot = 0.3
+FFdxdot = 0.5
 
 yfactor = 1
 Pydot = Pxdot*yfactor
@@ -67,11 +67,11 @@ Iydot = Ixdot*yfactor
 FFydot = FFxdot*yfactor
 FFdydot = FFdxdot*yfactor
 
-Pzdot = 8.0
-Dzdot = 0.5
-Izdot = 1.5
+Pzdot = 3.0
+Dzdot = 0.1
+Izdot = 0.1
 FFzdot = 0.0
-FFdzdot = 0.3
+FFdzdot = 0.0
 
 vel_P_gain = np.array([Pxdot, Pydot, Pzdot])
 vel_D_gain = np.array([Dxdot, Dydot, Dzdot])
@@ -83,24 +83,24 @@ vel_FF_dot_gain = np.array([FFdxdot, FFdydot, FFdzdot])
 vel_sp_dot_lpf_cutoff = 15.0
 
 # Attitude P gains
-Pphi = 8
+Pphi = 5.5
 Ptheta = Pphi
-Ppsi = 1.5
+Ppsi = 5
 PpsiStrong = 8
 
 att_P_gain = np.array([Pphi, Ptheta, Ppsi])
 
 # Rate P-D gains
-rateFactor = 0.5
-Pp = 0.4*rateFactor
-Dp = 0.005*2*rateFactor
+rateFactor = 1
+Pp = 0.8*rateFactor
+Dp = 0.005*rateFactor
 rate_FF_gain = 0.000*rateFactor
-rate_FF_dot_gain = 0.25
+rate_FF_dot_gain = 0.0
 
 Pq = Pp
 Dq = Dp 
 
-Pr = 3
+Pr = 2.5
 Dr = 0.019
 
 rate_P_gain = np.array([Pp, Pq, Pr])

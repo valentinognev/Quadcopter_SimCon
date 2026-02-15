@@ -112,7 +112,7 @@ def getStartOffboardInds(timestamp, data):
 def main():
     start_time = time.time()
     if LOAD_ULG_DATA:
-        ulgData = load_ulg("/home/valentin/RL/TESTFLIGHTS/RLCat2_3blades/RLFlights/log_1_2026-1-12-12-01-42.ulg", 
+        ulgData = load_ulg("/home/valentin/RL/TESTFLIGHTS/gazebo/log_0_2026-2-15-10-51-01.ulg", 
                         fields_to_extract=[['vehicle_local_position','vx'],['vehicle_local_position','vy'],['vehicle_local_position','vz'],
                                         ['vehicle_local_position_setpoint','vx'],['vehicle_local_position_setpoint','vy'],['vehicle_local_position_setpoint','vz'],
                                         ['vehicle_attitude','roll'],['vehicle_attitude','pitch'],['vehicle_attitude','yaw'],
@@ -121,7 +121,7 @@ def main():
                                         ['vehicle_angular_velocity','xyz[0]'],['vehicle_angular_velocity','xyz[1]'],['vehicle_angular_velocity','xyz[2]'],
                                         ['vehicle_thrust_setpoint','xyz[0]'],['vehicle_thrust_setpoint','xyz[1]'],['vehicle_thrust_setpoint','xyz[2]'],
                                         ['vehicle_control_mode','flag_control_offboard_enabled']],
-                        startTime=277, verbose=True)
+                        startTime=60, verbose=True)
         # ulgData = load_ulg("/home/valentin/RL/TESTFLIGHTS/RLCat2_3blades/PIDcontrolCircle/severalCircles_light.ulg", 
         #                 fields_to_extract=[['vehicle_local_position','vx'],['vehicle_local_position','vy'],['vehicle_local_position','vz'],
         #                                 ['vehicle_local_position_setpoint','vx'],['vehicle_local_position_setpoint','vy'],['vehicle_local_position_setpoint','vz'],
@@ -142,8 +142,8 @@ def main():
         #                                 ['vehicle_thrust_setpoint','xyz[0]'],['vehicle_thrust_setpoint','xyz[1]'],['vehicle_thrust_setpoint','xyz[2]'],
         #                                 ['vehicle_control_mode','flag_control_offboard_enabled']],
         #                 startTime=590, verbose=True)
-        offinds = getStartOffboardInds(ulgData['vehicle_control_mode_flag_control_offboard_enabled']['timestamp'], ulgData['vehicle_control_mode_flag_control_offboard_enabled']['data'])
-        offstartTime=ulgData['vehicle_control_mode_flag_control_offboard_enabled']['timestamp'][offinds]
+        offinds = 0 #getStartOffboardInds(ulgData['vehicle_control_mode_flag_control_offboard_enabled']['timestamp'], ulgData['vehicle_control_mode_flag_control_offboard_enabled']['data'])
+        offstartTime=0 #ulgData['vehicle_control_mode_flag_control_offboard_enabled']['timestamp'][offinds]
         Tf = 50 #ulgData['vehicle_control_mode_flag_control_offboard_enabled']['timestamp'][-10]
         # plt.plot(ulgData['vehicle_rates_setpoint_yaw']['timestamp'], ulgData['vehicle_rates_setpoint_yaw']['data'])
         # plt.plot(ulgData['vehicle_angular_velocity_xyz[2]']['timestamp'], ulgData['vehicle_angular_velocity_xyz[2]']['data'])
@@ -198,7 +198,7 @@ def main():
     # For attitude target (angles + thrust, rates calculated): use ControlType.ATT
     # For attitude rate target (rates + thrust, bypasses attitude_control): use ControlType.ATT_RATE
     # ControlType: XYZ_POS, XY_VEL_Z_POS, XYZ_VEL, ATT, ATT_RATE
-    ctrlType = ControlType.XY_VEL_Z_POS if (LOAD_ULG_DATA and ulgData is not None) else ControlType.XYZ_POS
+    ctrlType = ControlType.XYZ_POS if (LOAD_ULG_DATA and ulgData is not None) else ControlType.XYZ_POS
     # Select Position Trajectory Type (0: hover,                    1: pos_waypoint_timed,      2: pos_waypoint_interp,    
     #                                  3: minimum velocity          4: minimum accel,           5: minimum jerk,           6: minimum snap
     #                                  7: minimum accel_stop        8: minimum jerk_stop        9: minimum snap_stop
