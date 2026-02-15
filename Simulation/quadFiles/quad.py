@@ -6,15 +6,14 @@ license: MIT
 Please feel free to use and modify this, but keep the above information. Thanks!
 """
 
+import os
+import sys
+
 import numpy as np
 from numpy import sin, cos, tan, pi, sign
 from scipy.integrate import ode
-import sys
-import os
-simulation_path = os.path.join(os.path.dirname(__file__), 'Quadcopter_SimCon', 'Simulation')
-sys.path.append(simulation_path)
 
-# Support both relative and absolute imports
+# Support both relative and absolute imports (no sys.path mutation)
 try:
     from .initQuad import sys_params, init_cmd, init_state
     from ..utils.windModel import Wind

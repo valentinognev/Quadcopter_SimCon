@@ -6,13 +6,16 @@ license: MIT
 Please feel free to use and modify this, but keep the above information. Thanks!
 """
 
-import numpy as np
-import matplotlib
-import matplotlib.pyplot as plt
-import time
-import cProfile
+import logging
 import os
 import sys
+import time
+
+import matplotlib
+import matplotlib.pyplot as plt
+import numpy as np
+
+logger = logging.getLogger(__name__)
 
 from trajectory import Trajectory, PositionTrajectoryType, YawTrajectoryType, WaypointTimeMode
 from ctrl import Control, ControlType
@@ -50,7 +53,7 @@ def quad_sim(t, Ts, quads, ctrl, wind, traj):
 
     # Generate Commands (for next iteration)
     # ---------------------------
-    ctrl.controller(traj=traj, quads=quads, Ts=Ts)
+    ctrl.controller(traj, quads, Ts)
 
     return t
 
@@ -81,7 +84,7 @@ def quad_sim_system_manager(t, Ts, quads, ctrl, wind, traj, sys_manager, flight_
         "yaw_rate": yaw_rate_cmd,
     }
     traj.desiredState(t, Ts, quads, desired=desired)
-    ctrl.controller(traj=traj, quads=quads, Ts=Ts)
+    ctrl.controller(traj, quads, Ts)
     quads.update(t, Ts, ctrl.w_cmd, wind)
     return t + Ts
     
@@ -126,15 +129,15 @@ def test_all_trajectory_types():
                 if round(t, 3) >= Tf:
                     break
                 t = quad_sim(t, Ts, quads, ctrl, wind, traj)
-            print("  trajSelect[0] = {} ({}) OK".format(xyz_val, name))
+            logger.info("  trajSelect[0] = %s (%s) OK", xyz_val, name)
             passed += 1
         except Exception as e:
-            print("  trajSelect[0] = {} ({}) FAIL: {}".format(xyz_val, name, e))
+            logger.warning("  trajSelect[0] = %s (%s) FAIL: %s", xyz_val, name, e)
             failed.append((xyz_val, name, str(e)))
-    print("Result: {}/{} passed.".format(passed, len(PositionTrajectoryType)))
+    logger.info("Result: %s/%s passed.", passed, len(PositionTrajectoryType))
     if failed:
         for xyz_val, name, err in failed:
-            print("  - {} ({}) : {}".format(xyz_val, name, err))
+            logger.warning("  - %s (%s): %s", xyz_val, name, err)
     return len(failed) == 0
 
 
@@ -146,9 +149,9 @@ def main():
         try:
             from load_drone_config import load_drone_config
             drone_params, control_params = load_drone_config(DRONE_CONFIG_PATH)
-            print("Loaded drone and control config from {}".format(DRONE_CONFIG_PATH))
+            logger.info("Loaded drone and control config from %s", DRONE_CONFIG_PATH)
         except Exception as e:
-            print("Warning: could not load drone config ({}): {}. Using defaults.".format(DRONE_CONFIG_PATH, e))
+            logger.warning("Could not load drone config (%s): %s. Using defaults.", DRONE_CONFIG_PATH, e)
 
     # When using system_manager, only first quad (index 0) is controlled; use 1 quad.
     numOfQuads = 1 if USE_SYSTEM_MANAGER else 4
@@ -179,7 +182,7 @@ def main():
     #   MINIMUM_ACCEL_STOP (7), MINIMUM_JERK_STOP (8), MINIMUM_SNAP_STOP (9),
     #   MINIMUM_JERK_FULL_STOP (10), MINIMUM_SNAP_FULL_STOP (11),
     #   POS_WAYPOINT_ARRIVED (12), POS_WAYPOINT_ARRIVED_WAIT (13)
-    trajSelect[0] = PositionTrajectoryType.POS_WAYPOINT_INTERP.value
+    trajSelect[0] = PositionTrajectoryType.POS_WAYPOINT_TIMED.value
     # Yaw Trajectory Type options:
     #   YawTrajectoryType.NONE (0), YAW_WAYPOINT_TIMED (1), YAW_WAYPOINT_INTERP (2),
     #   FOLLOW (3), ZERO (4)
@@ -204,7 +207,7 @@ def main():
             sys_manager_config["log_dir"] = log_dir
             sys_manager_config["loop_period"] = Ts
             sys_manager_config["currentTime"] = 0
-            print("Loaded system_manager mission from {}".format(SYSTEM_MANAGER_MISSION_CONFIG))
+            logger.info("Loaded system_manager mission from %s", SYSTEM_MANAGER_MISSION_CONFIG)
         else:
             sys_manager_config = {
                 "primaryControllerType": "VELOCITYPID",
@@ -219,9 +222,9 @@ def main():
         sys_manager = None
         flight_data_from_swarm = None
 
-    print("Control type: {}".format(ctrlType))
+    logger.info("Control type: %s", ctrlType)
     if USE_SYSTEM_MANAGER:
-        print("Using system_manager as high-level controller (non-realtime, in-process).")
+        logger.info("Using system_manager as high-level controller (non-realtime, in-process).")
 
     # Initialize Quadcopter, Controller, Wind, Result Matrixes
     # ---------------------------
@@ -277,6 +280,7 @@ def main():
     sDes_traj_all[0]  = traj.sDes
     sDes_calc_all[0]  = ctrl.sDesCalc
     w_cmd_all[0]      = ctrl.w_cmd
+    # Store step 0 with same layout as later steps: (4, numOfQuads) for wMotor/thr/tor
     wMotor_all[0]     = quads.wMotor
     thr_all[0]        = quads.thr
     tor_all[0]        = quads.tor
@@ -290,47 +294,42 @@ def main():
             t = quad_sim_system_manager(t, Ts, quads, ctrl, wind, traj, sys_manager, flight_data_from_swarm)
         else:
             t = quad_sim(t, Ts, quads, ctrl, wind, traj)
-        
-        # print("{:.3f}".format(t))
+
         try:
             t_all[i]             = t
-            s_all[i]           = quads.state
-            pos_all[i]         = quads.pos
-            vel_all[i]         = quads.vel
-            quat_all[i]        = quads.quat
-            omega_all[i]       = quads.omega
-            euler_all[i]       = quads.euler
-            sDes_traj_all[i]   = traj.sDes
-            sDes_calc_all[i]   = ctrl.sDesCalc
-            w_cmd_all[i]       = ctrl.w_cmd
-            wMotor_all[i]      = quads.wMotor.T
-            thr_all[i]         = quads.thr.T
-            tor_all[i]         = quads.tor.T
-        except:
+            s_all[i]             = quads.state
+            pos_all[i]           = quads.pos
+            vel_all[i]           = quads.vel
+            quat_all[i]          = quads.quat
+            omega_all[i]         = quads.omega
+            euler_all[i]         = quads.euler
+            sDes_traj_all[i]     = traj.sDes
+            sDes_calc_all[i]     = ctrl.sDesCalc
+            w_cmd_all[i]         = ctrl.w_cmd
+            wMotor_all[i]        = quads.wMotor
+            thr_all[i]           = quads.thr
+            tor_all[i]           = quads.tor
+        except IndexError as e:
+            logger.warning("Simulation index mismatch at t=%.3f (i=%d): %s. Stopping.", t, i, e)
             break
         i += 1
-    
+
     end_time = time.time()
-    print("Simulated {:.2f}s in {:.6f}s.".format(t, end_time - start_time))
+    logger.info("Simulated %.2fs in %.6fs.", t, end_time - start_time)
 
     # View Results
     # ---------------------------
-
-    # utils.fullprint(sDes_traj_all[:,3:6])
-    
     utils.makeFigures(quads.params, t_all, pos_all, vel_all, quat_all, omega_all, euler_all, w_cmd_all, wMotor_all, thr_all, tor_all, sDes_traj_all, sDes_calc_all)
-           
     ani = utils.sameAxisAnimation(t_all, traj.wps, pos_all, quat_all, sDes_traj_all, Ts, quads.params, traj.xyzType, traj.yawType, ifsave)
-    # plt.show()
-    pass
+
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
     if len(sys.argv) > 1 and sys.argv[1] == "--test-all-traj":
-        print("Testing all PositionTrajectoryType options (trajSelect[0] = 0..13)...")
+        logger.info("Testing all PositionTrajectoryType options (trajSelect[0] = 0..13)...")
         ok = test_all_trajectory_types()
         sys.exit(0 if ok else 1)
-    if (config.orient == "NED" or config.orient == "ENU"):
+    if config.orient in ("NED", "ENU"):
         main()
-        # cProfile.run('main()')
     else:
-        raise Exception("{} is not a valid orientation. Verify config.py file.".format(config.orient))
+        raise ValueError("Invalid orientation %r. Verify config.py (use NED or ENU)." % config.orient)

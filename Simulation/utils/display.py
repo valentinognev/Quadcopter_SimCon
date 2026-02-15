@@ -315,7 +315,8 @@ def makeFigures(params, time, pos_all, vel_all, quat_all, omega_all, euler_all, 
         ax1 = plt.subplot(2, numOfQuads, (1-1)*numOfQuads+qi+1)
         plt.suptitle('Thrust and Torque')
         plt.title('Quad '+str(qi))
-        plt.plot(time, thrust[:,0], time, thrust[:,1], time, thrust[:,2], time, thrust[:,3])
+        # thrust/torque shape: (numTimeStep, 4, numOfQuads)
+        plt.plot(time, thrust[:, 0, qi], time, thrust[:, 1, qi], time, thrust[:, 2, qi], time, thrust[:, 3, qi])
         plt.grid(True)
         plt.legend(['thr1','thr2','thr3','thr4'], loc='upper right')
         plt.xlabel('Time (s)')
@@ -323,7 +324,7 @@ def makeFigures(params, time, pos_all, vel_all, quat_all, omega_all, euler_all, 
         plt.draw()
 
         ax2 = plt.subplot(2, numOfQuads, (2-1)*numOfQuads+qi+1, sharex=ax1)
-        plt.plot(time, torque[:,0], time, torque[:,1], time, torque[:,2], time, torque[:,3])
+        plt.plot(time, torque[:, 0, qi], time, torque[:, 1, qi], time, torque[:, 2, qi], time, torque[:, 3, qi])
         plt.grid(True)
         plt.legend(['tor1','tor2','tor3','tor4'], loc='upper right')
         plt.xlabel('Time (s)')

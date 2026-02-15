@@ -25,7 +25,7 @@ class Wind:
         if (len(args) == 0):
             self.windType = 'NONE'
         elif not isinstance(args[0], str):
-            raise Exception('Not a valid wind type.')
+            raise ValueError('Not a valid wind type.')
         else:
             self.windType = args[0].upper()
 
@@ -95,7 +95,7 @@ class Wind:
 
         else:
 
-            raise Exception('Not a valid wind type.')
+            raise ValueError('Not a valid wind type.')
 
 
     def randomWind(self, t):

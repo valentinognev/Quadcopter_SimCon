@@ -20,15 +20,32 @@ from numpy.linalg import norm
 
 # Support both relative and absolute imports
 try:
-    from .waypoints import makeWaypoints
+    from .waypoints import makeWaypoints, DIST_CONSIDER_ARRIVED
     from . import config
     from .ctrl import ControlType
 except ImportError:
-    from waypoints import makeWaypoints
+    from waypoints import makeWaypoints, DIST_CONSIDER_ARRIVED
     import config
     from ctrl import ControlType
 
 from enum import Enum
+
+
+def _validate_waypoint_times(t_wps, wps):
+    """
+    Validate that waypoint time and position arrays are consistent and ordered.
+    Raises ValueError if validation fails.
+    """
+    n_t = t_wps.shape[0]
+    n_wp = wps[::3, :].shape[0]
+    if n_t != n_wp:
+        raise ValueError(
+            "Time array and waypoint array size mismatch: t_wps has %d rows, wps has %d waypoints (expected %d)."
+            % (n_t, n_wp, n_t)
+        )
+    t_time = t_wps[:, 0].flatten()
+    if t_time.size > 1 and (np.diff(t_time) <= 0).any():
+        raise ValueError("Waypoint time array must be strictly increasing.")
 
 
 class PositionTrajectoryType(Enum):
@@ -152,12 +169,12 @@ class Trajectory:
         self.desYawRate = np.zeros((1, self.numOfQuads))         # Desired yaw speed
         self.sDes = np.concatenate([self.desPos, self.desVel, self.desAcc, self.desThr, self.desEul, self.desPQR, self.desYawRate], axis=0).astype(float)
 
+    def _validate_waypoint_times(self):
+        _validate_waypoint_times(self.t_wps, self.wps)
+
     def _pos_waypoint_timed(self, t):
-        if not (self.t_wps.shape[0] == self.wps[::3,:].shape[0]):
-            raise Exception("Time array and waypoint array not the same size.")
+        self._validate_waypoint_times()
         t_time = self.t_wps[:, 0].flatten()
-        if (np.diff(t_time) <= 0).any():
-            raise Exception("Time array isn't properly ordered.")
         if (t == 0):
             self.desPos = self.wps[0:3,:]
         elif (t >= t_time[-1]):
@@ -167,11 +184,8 @@ class Trajectory:
             self.desPos = self.wps[self.t_idx*3:self.t_idx*3+3,:]
 
     def _pos_waypoint_interp(self, t):
-        if not (self.t_wps.shape[0] == self.wps[::3,:].shape[0]):
-            raise Exception("Time array and waypoint array not the same size.")
+        self._validate_waypoint_times()
         t_time = self.t_wps[:, 0].flatten()
-        if (np.diff(t_time) <= 0).any():
-            raise Exception("Time array isn't properly ordered.")
         if (t == 0):
             self.desPos = self.wps[0:3,:]
         elif (t >= self.t_wps[-1, 0]):
@@ -184,8 +198,7 @@ class Trajectory:
 
     def _pos_waypoint_min(self, t):
         """Minimum velocity/accel/jerk/snap trajectory through waypoints."""
-        if not (self.t_wps.shape[0] == self.wps[::3,:].shape[0]):
-            raise Exception("Time array and waypoint array not the same size.")
+        self._validate_waypoint_times()
         nb_coeff = self.deriv_order*2
         if t == 0:
             self.t_idx = 0
@@ -218,7 +231,6 @@ class Trajectory:
                     self.desAcc[:, i] = acc_1d
 
     def _pos_waypoint_arrived(self, t, quads):
-        dist_consider_arrived = 0.2
         n_wp = self.wps.shape[0] // 3
         pos0 = np.atleast_2d(quads.pos)[0, :]
         if (t == 0):
@@ -228,9 +240,9 @@ class Trajectory:
             # wps layout: rows t_idx*3, t_idx*3+1, t_idx*3+2 = x,y,z of waypoint t_idx
             wp = self.wps[self.t_idx*3:self.t_idx*3+3, 0]
             distance_to_next_wp = np.sqrt((wp[0]-pos0[0])**2 + (wp[1]-pos0[1])**2 + (wp[2]-pos0[2])**2)
-            if (distance_to_next_wp < dist_consider_arrived):
+            if distance_to_next_wp < DIST_CONSIDER_ARRIVED:
                 self.t_idx += 1
-                if (self.t_idx >= n_wp):
+                if self.t_idx >= n_wp:
                     self.end_reached = 1
                     self.t_idx = -1
         # waypoint position: rows t_idx*3..t_idx*3+2, or last 3 rows when t_idx == -1
@@ -241,7 +253,6 @@ class Trajectory:
                 self.desPos[:, i] = wp_pos[:, i] if wp_pos.shape[1] > i else wp_pos[:, 0]
 
     def _pos_waypoint_arrived_wait(self, t, quads):
-        dist_consider_arrived = 0.2
         n_wp = self.wps.shape[0] // 3
         pos0 = np.atleast_2d(quads.pos)[0, :]
         if (t == 0):
@@ -252,7 +263,7 @@ class Trajectory:
         elif not(self.end_reached):
             wp = self.wps[self.t_idx*3:self.t_idx*3+3, 0]
             distance_to_next_wp = np.sqrt((wp[0]-pos0[0])**2 + (wp[1]-pos0[1])**2 + (wp[2]-pos0[2])**2)
-            if (distance_to_next_wp < dist_consider_arrived) and not self.arrived:
+            if distance_to_next_wp < DIST_CONSIDER_ARRIVED and not self.arrived:
                 self.t_arrived = t
                 self.arrived = True
             elif self.arrived and (t-self.t_arrived > self.t_wps[self.t_idx, 0]):
@@ -268,13 +279,13 @@ class Trajectory:
                 self.desPos[:, i] = wp_pos[:, i] if wp_pos.shape[1] > i else wp_pos[:, 0]
 
     def _yaw_waypoint_timed(self, t):
-        if not (len(self.t_wps) == len(self.y_wps)):
-            raise Exception("Time array and waypoint array not the same size.")
+        if len(self.t_wps) != len(self.y_wps):
+            raise ValueError("Yaw time array and yaw waypoint array must have same length (got %d vs %d)." % (len(self.t_wps), len(self.y_wps)))
         self.desEul[2] = self.y_wps[self.t_idx]
 
     def _yaw_waypoint_interp(self, t, Ts):
-        if not (len(self.t_wps) == len(self.y_wps)):
-            raise Exception("Time array and waypoint array not the same size.")
+        if len(self.t_wps) != len(self.y_wps):
+            raise ValueError("Yaw time array and yaw waypoint array must have same length (got %d vs %d)." % (len(self.t_wps), len(self.y_wps)))
         if (t == 0) or (t >= self.t_wps[-1].max()):
             self.desEul[2] = self.y_wps[self.t_idx]
         else:

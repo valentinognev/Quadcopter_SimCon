@@ -15,14 +15,18 @@ try:
 except ImportError:
     import config
 
-deg2rad = pi/180.0
+deg2rad = pi / 180.0
+
+# Constants for trajectory/waypoint logic (tunable)
+DIST_CONSIDER_ARRIVED = 0.2  # (m) distance to waypoint to consider "arrived"
+DEFAULT_V_AVERAGE = 1.0      # (m/s) default average speed for waypoint timing
+DEFAULT_T_INI = 3.0          # (s) initial time before first waypoint
+
 
 def makeWaypoints(numOfQuads):
-    
-    v_average = 1
-
+    v_average = DEFAULT_V_AVERAGE
     # Segment durations (s) between waypoints; must be > 0 so times are strictly increasing
-    t_ini = 3
+    t_ini = DEFAULT_T_INI
     t_segments = np.array([4.0, 4.0, 4.0, 4.0])  # 4 segments for 5 waypoints, or use 5 segments for 6 waypoints
     
     wp_ini = np.array([0, 0, 0])
