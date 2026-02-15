@@ -9,6 +9,9 @@ Please feel free to use and modify this, but keep the above information. Thanks!
 import numpy as np
 from numpy import pi
 import matplotlib.pyplot as plt
+import csv
+import os
+from datetime import datetime
 
 # Support both relative and absolute imports
 try:
@@ -134,7 +137,71 @@ def makeFigures(params, time, pos_all, vel_all, quat_all, omega_all, euler_all, 
         psiDes[ii]   = YPR[0]*rad2deg
         thetaDes[ii] = YPR[1]*rad2deg
         phiDes[ii]   = YPR[2]*rad2deg
-    
+
+    # Log result vectors to CSV for PlotJuggler (quadSimCon_date_time.csv)
+    _simulation_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    log_dir = os.path.join(_simulation_dir, "logs")
+    os.makedirs(log_dir, exist_ok=True)
+    log_filename = os.path.join(log_dir, "quadSimCon_{}.csv".format(datetime.now().strftime("%Y-%m-%d_%H-%M-%S")))
+    fieldnames = [
+        "timestamp",
+        "pos_ned/x", "pos_ned/y", "pos_ned/z",
+        "vel_ned/x", "vel_ned/y", "vel_ned/z",
+        "quat_ned_bodyfrd/x", "quat_ned_bodyfrd/y", "quat_ned_bodyfrd/z", "quat_ned_bodyfrd/w",
+        "omega_frd/x", "omega_frd/y", "omega_frd/z",
+        "euler/roll", "euler/pitch", "euler/yaw",
+        "command/[0]", "command/[1]", "command/[2]", "command/[3]",
+        "wMotor/[0]", "wMotor/[1]", "wMotor/[2]", "wMotor/[3]",
+        "thrust/[0]", "thrust/[1]", "thrust/[2]", "thrust/[3]",
+        "torque/[0]", "torque/[1]", "torque/[2]", "torque/[3]",
+        "pos_sp/x", "pos_sp/y", "pos_sp/z",
+        "vel_sp/x", "vel_sp/y", "vel_sp/z",
+        "thrust_sp/x", "thrust_sp/y", "thrust_sp/z",
+        "quat_des/x", "quat_des/y", "quat_des/z", "quat_des/w",
+        "rate_cmd/roll", "rate_cmd/pitch", "rate_cmd/yaw",
+        "euler_des/roll", "euler_des/pitch", "euler_des/yaw",
+        "pos_traj/x", "pos_traj/y", "pos_traj/z",
+        "vel_traj/x", "vel_traj/y", "vel_traj/z",
+        "acc_traj/x", "acc_traj/y", "acc_traj/z",
+        "euler_sp_traj/roll", "euler_sp_traj/pitch", "euler_sp_traj/yaw",
+        "rate_sp_traj/roll", "rate_sp_traj/pitch", "rate_sp_traj/yaw",
+        "pos_err/x", "pos_err/y", "pos_err/z",
+        "dist_from_target",
+    ]
+    with open(log_filename, "w", newline="") as csvfile:
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        writer.writeheader()
+        n = len(time)
+        omega_rad = omega_all  # rad/s (no deg conversion for logging)
+        for i in range(n):
+            row = {
+                "timestamp": time[i],
+                "pos_ned/x": pos_all[i, 0], "pos_ned/y": pos_all[i, 1], "pos_ned/z": pos_all[i, 2],
+                "vel_ned/x": vel_all[i, 0], "vel_ned/y": vel_all[i, 1], "vel_ned/z": vel_all[i, 2],
+                "quat_ned_bodyfrd/x": quat_all[i, 0], "quat_ned_bodyfrd/y": quat_all[i, 1],
+                "quat_ned_bodyfrd/z": quat_all[i, 2], "quat_ned_bodyfrd/w": quat_all[i, 3],
+                "omega_frd/x": omega_rad[i, 0], "omega_frd/y": omega_rad[i, 1], "omega_frd/z": omega_rad[i, 2],
+                "euler/roll": phi[i], "euler/pitch": theta[i], "euler/yaw": psi[i],
+                "command/[0]": uM1[i], "command/[1]": uM2[i], "command/[2]": uM3[i], "command/[3]": uM4[i],
+                "wMotor/[0]": wM1[i], "wMotor/[1]": wM2[i], "wMotor/[2]": wM3[i], "wMotor/[3]": wM4[i],
+                "thrust/[0]": thrust[i, 0], "thrust/[1]": thrust[i, 1], "thrust/[2]": thrust[i, 2], "thrust/[3]": thrust[i, 3],
+                "torque/[0]": torque[i, 0], "torque/[1]": torque[i, 1], "torque/[2]": torque[i, 2], "torque/[3]": torque[i, 3],
+                "pos_sp/x": x_sp[i], "pos_sp/y": y_sp[i], "pos_sp/z": z_sp[i],
+                "vel_sp/x": Vx_sp[i], "vel_sp/y": Vy_sp[i], "vel_sp/z": Vz_sp[i],
+                "thrust_sp/x": x_thr_sp[i], "thrust_sp/y": y_thr_sp[i], "thrust_sp/z": z_thr_sp[i],
+                "quat_des/x": q0Des[i], "quat_des/y": q1Des[i], "quat_des/z": q2Des[i], "quat_des/w": q3Des[i],
+                "rate_cmd/roll": pDes[i], "rate_cmd/pitch": qDes[i], "rate_cmd/yaw": rDes[i],
+                "euler_des/roll": phiDes[i], "euler_des/pitch": thetaDes[i], "euler_des/yaw": psiDes[i],
+                "pos_traj/x": x_tr[i], "pos_traj/y": y_tr[i], "pos_traj/z": z_tr[i],
+                "vel_traj/x": Vx_tr[i], "vel_traj/y": Vy_tr[i], "vel_traj/z": Vz_tr[i],
+                "acc_traj/x": Ax_tr[i], "acc_traj/y": Ay_tr[i], "acc_traj/z": Az_tr[i],
+                "euler_sp_traj/roll": phi_sp_traj[i], "euler_sp_traj/pitch": theta_sp_traj[i], "euler_sp_traj/yaw": psi_sp_traj[i],
+                "rate_sp_traj/roll": p_sp_traj[i], "rate_sp_traj/pitch": q_sp_traj[i], "rate_sp_traj/yaw": r_sp_traj[i],
+                "pos_err/x": x_err[i], "pos_err/y": y_err[i], "pos_err/z": z_err[i],
+                "dist_from_target": dist_from_target[i],
+            }
+            writer.writerow(row)
+
     plt.show()
 
     plt.figure(1)
