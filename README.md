@@ -98,6 +98,30 @@ The mixer (not based from PX4) allows to find the exact RPM of each motor given 
  
 </p>
 
+## Current vs reference (single-drone parity)
+
+This repo (Quadcopter_SimCon in CatSwarm) can run **several drones** and is currently configured for a single drone. A **reference** single-drone version lives at `/home/valentin/RL/Quadcopter_SimCon_ref/`. Same input can yield different results if parameters differ.
+
+- **Current**: drone and control parameters are in `Simulation/iris_drone_config.json` (loaded by `load_drone_config.py`). Logs: `Simulation/logs/`.
+- **Reference**: parameters are in code: `Simulation/quadFiles/initQuad.py` (drone) and `Simulation/ctrl.py` (control). Logs: `Simulation/logs/` in that directory.
+
+To get **identical results** with the same trajectory/waypoints, set `iris_drone_config.json` to match the reference:
+
+| Source | Parameter | Reference value | Notes |
+|--------|-----------|-----------------|--------|
+| initQuad | mB, g, dxm, dym, dzm | 1.5, 9.81, 0.13, 0.22, 0.023 | Same in JSON |
+| initQuad | IB | diag(0.05825, 0.05825, 0.0276125) | Ref uses 0.029125×2, 0.029125×2, 0.055225/2 |
+| initQuad | IRzz, kTh, kTo | 0.000274004, 5.84e-6, kTh×0.055 | kTo in ref = kTh*0.055 |
+| initQuad | HoverThr, minThr, tau | 0.35, **0.2**, 0.0625 | minThr ref = 0.2 (JSON default 0.1) |
+| ctrl | pos_P_gain | [**1.5**, **1.5**, 1.3] | Ref Px=Py=1.5 |
+| ctrl | vel_P_gain | [7, 7, **3.0**] | Ref Pzdot=3.0 |
+| ctrl | vel_I_gain | [0.2, 0.2, **0.1**] | Ref Izdot=0.1 |
+| ctrl | vel_FF_gain | [0.3, 0.3, **0.0**] | Ref FFzdot=0 |
+| ctrl | vel_FF_dot_gain | [**0.5**, **0.5**, 0] | Ref 0.5 for x,y |
+| ctrl | rate_FF_dot_gain | **0** | Ref 0 (JSON often 0.25) |
+
+The `iris_drone_config.json` shipped in this repo is set to these reference values so that single-drone runs match the reference simulation.
+
 ## To-Do
 * Add Perlin noise wind model
 * Develop method to find gains for best response

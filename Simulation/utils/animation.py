@@ -56,13 +56,15 @@ def sameAxisAnimation(t_all, waypoints, pos_all, quat_all, sDes_tr_all, Ts, para
     line2_list = []
     line3_list = []
     
-    # Use different colors for each quad
+    # Quad colors for trajectory; front/back arms use fixed distinct colors for clarity
     colors = plt.cm.tab10(np.linspace(0, 1, numOfQuads))
+    arm_front_color = '#2E86AB'   # blue – front arm (+dxm)
+    arm_back_color = '#E94F37'    # red-orange – back arm (-dxm)
     
     for qi in range(numOfQuads):
-        # Create lines for this quad with unique colors
-        line1, = ax.plot([], [], [], lw=2, color=colors[qi])
-        line2, = ax.plot([], [], [], lw=2, color=colors[qi])
+        # line1 = front arm (+dxm), line2 = back arm (-dxm)
+        line1, = ax.plot([], [], [], lw=2, color=arm_front_color)
+        line2, = ax.plot([], [], [], lw=2, color=arm_back_color)
         line3, = ax.plot([], [], [], '--', lw=1, color=colors[qi], alpha=0.7)
         line1_list.append(line1)
         line2_list.append(line2)

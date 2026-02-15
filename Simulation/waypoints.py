@@ -31,9 +31,9 @@ def makeWaypoints(numOfQuads):
                    [-2, -1, -3],
                    [3, -2, 0],
                    wp_ini])
-    wp = wp[3,:]
+    # wp = wp[3,:]
     yaw_ini = 0    
-    yaw = np.array([20, -90, 120, 45])
+    yaw = np.array([20, -90, 0, 0])
 
     t = np.hstack((t_ini, t)).astype(float)
     wp = np.vstack((wp_ini, wp)).astype(float)

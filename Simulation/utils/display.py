@@ -6,6 +6,10 @@ license: MIT
 Please feel free to use and modify this, but keep the above information. Thanks!
 """
 
+import os
+import csv
+from datetime import datetime
+
 import numpy as np
 from numpy import pi
 import matplotlib.pyplot as plt
@@ -361,6 +365,79 @@ def makeFigures(params, time, pos_all, vel_all, quat_all, omega_all, euler_all, 
         plt.xlabel('Time (s)')
         plt.ylabel('Position Error (m)')
         plt.draw()
+
+    # Log plotted data to CSV for PlotJuggler (quadSimCon_date_time.csv)
+    _simulation_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    log_dir = os.path.join(_simulation_dir, "logs")
+    os.makedirs(log_dir, exist_ok=True)
+    log_filename = os.path.join(log_dir, "quadSimCon_{}.csv".format(datetime.now().strftime("%Y-%m-%d_%H-%M-%S")))
+    fieldnames = [
+        "quad_id", "timestamp",
+        "pos_ned/x", "pos_ned/y", "pos_ned/z",
+        "vel_ned/x", "vel_ned/y", "vel_ned/z",
+        "quat_ned_bodyfrd/x", "quat_ned_bodyfrd/y", "quat_ned_bodyfrd/z", "quat_ned_bodyfrd/w",
+        "omega_frd/x", "omega_frd/y", "omega_frd/z",
+        "euler/roll", "euler/pitch", "euler/yaw",
+        "command/[0]", "command/[1]", "command/[2]", "command/[3]",
+        "wMotor/[0]", "wMotor/[1]", "wMotor/[2]", "wMotor/[3]",
+        "thrust/[0]", "thrust/[1]", "thrust/[2]", "thrust/[3]",
+        "torque/[0]", "torque/[1]", "torque/[2]", "torque/[3]",
+        "pos_sp/x", "pos_sp/y", "pos_sp/z",
+        "vel_sp/x", "vel_sp/y", "vel_sp/z",
+        "thrust_sp/x", "thrust_sp/y", "thrust_sp/z",
+        "quat_des/x", "quat_des/y", "quat_des/z", "quat_des/w",
+        "rate_cmd/roll", "rate_cmd/pitch", "rate_cmd/yaw",
+        "euler_des/roll", "euler_des/pitch", "euler_des/yaw",
+        "pos_traj/x", "pos_traj/y", "pos_traj/z",
+        "vel_traj/x", "vel_traj/y", "vel_traj/z",
+        "acc_traj/x", "acc_traj/y", "acc_traj/z",
+        "euler_sp_traj/roll", "euler_sp_traj/pitch", "euler_sp_traj/yaw",
+        "rate_sp_traj/roll", "rate_sp_traj/pitch", "rate_sp_traj/yaw",
+        "pos_err/x", "pos_err/y", "pos_err/z",
+        "dist_from_target",
+    ]
+    n = len(time)
+    with open(log_filename, "w", newline="") as csvfile:
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        writer.writeheader()
+        for i in range(n):
+            for qi in range(numOfQuads):
+                YPR = utils.quatToYPR_ZYX(sDes_calc[i, 9:13, qi])
+                phi_des_i = YPR[2] * rad2deg
+                theta_des_i = YPR[1] * rad2deg
+                psi_des_i = YPR[0] * rad2deg
+                pos_err_i = pos_all[i, qi, :] - sDes_calc[i, 0:3, qi]
+                dist_i = np.sqrt(np.sum(pos_err_i ** 2))
+                row = {
+                    "quad_id": qi,
+                    "timestamp": time[i],
+                    "pos_ned/x": pos_all[i, qi, 0], "pos_ned/y": pos_all[i, qi, 1], "pos_ned/z": pos_all[i, qi, 2],
+                    "vel_ned/x": vel_all[i, qi, 0], "vel_ned/y": vel_all[i, qi, 1], "vel_ned/z": vel_all[i, qi, 2],
+                    "quat_ned_bodyfrd/x": quat_all[i, qi, 0], "quat_ned_bodyfrd/y": quat_all[i, qi, 1],
+                    "quat_ned_bodyfrd/z": quat_all[i, qi, 2], "quat_ned_bodyfrd/w": quat_all[i, qi, 3],
+                    "omega_frd/x": omega_all[i, qi, 0], "omega_frd/y": omega_all[i, qi, 1], "omega_frd/z": omega_all[i, qi, 2],
+                    "euler/roll": euler_all[i, qi, 0] * rad2deg, "euler/pitch": euler_all[i, qi, 1] * rad2deg, "euler/yaw": euler_all[i, qi, 2] * rad2deg,
+                    "command/[0]": commands[i, 0, qi] * rads2rpm, "command/[1]": commands[i, 1, qi] * rads2rpm,
+                    "command/[2]": commands[i, 2, qi] * rads2rpm, "command/[3]": commands[i, 3, qi] * rads2rpm,
+                    "wMotor/[0]": wMotor_all[i, 0, qi] * rads2rpm, "wMotor/[1]": wMotor_all[i, 1, qi] * rads2rpm,
+                    "wMotor/[2]": wMotor_all[i, 2, qi] * rads2rpm, "wMotor/[3]": wMotor_all[i, 3, qi] * rads2rpm,
+                    "thrust/[0]": thrust[i, 0, qi], "thrust/[1]": thrust[i, 1, qi], "thrust/[2]": thrust[i, 2, qi], "thrust/[3]": thrust[i, 3, qi],
+                    "torque/[0]": torque[i, 0, qi], "torque/[1]": torque[i, 1, qi], "torque/[2]": torque[i, 2, qi], "torque/[3]": torque[i, 3, qi],
+                    "pos_sp/x": sDes_calc[i, 0, qi], "pos_sp/y": sDes_calc[i, 1, qi], "pos_sp/z": sDes_calc[i, 2, qi],
+                    "vel_sp/x": sDes_calc[i, 3, qi], "vel_sp/y": sDes_calc[i, 4, qi], "vel_sp/z": sDes_calc[i, 5, qi],
+                    "thrust_sp/x": sDes_calc[i, 6, qi], "thrust_sp/y": sDes_calc[i, 7, qi], "thrust_sp/z": sDes_calc[i, 8, qi],
+                    "quat_des/x": sDes_calc[i, 9, qi], "quat_des/y": sDes_calc[i, 10, qi], "quat_des/z": sDes_calc[i, 11, qi], "quat_des/w": sDes_calc[i, 12, qi],
+                    "rate_cmd/roll": sDes_calc[i, 13, qi] * rad2deg, "rate_cmd/pitch": sDes_calc[i, 14, qi] * rad2deg, "rate_cmd/yaw": sDes_calc[i, 15, qi] * rad2deg,
+                    "euler_des/roll": phi_des_i, "euler_des/pitch": theta_des_i, "euler_des/yaw": psi_des_i,
+                    "pos_traj/x": sDes_traj[i, 0, qi], "pos_traj/y": sDes_traj[i, 1, qi], "pos_traj/z": sDes_traj[i, 2, qi],
+                    "vel_traj/x": sDes_traj[i, 3, qi], "vel_traj/y": sDes_traj[i, 4, qi], "vel_traj/z": sDes_traj[i, 5, qi],
+                    "acc_traj/x": sDes_traj[i, 6, qi], "acc_traj/y": sDes_traj[i, 7, qi], "acc_traj/z": sDes_traj[i, 8, qi],
+                    "euler_sp_traj/roll": sDes_traj[i, 12, qi] * rad2deg, "euler_sp_traj/pitch": sDes_traj[i, 13, qi] * rad2deg, "euler_sp_traj/yaw": sDes_traj[i, 14, qi] * rad2deg,
+                    "rate_sp_traj/roll": sDes_traj[i, 15, qi] * rad2deg, "rate_sp_traj/pitch": sDes_traj[i, 16, qi] * rad2deg, "rate_sp_traj/yaw": sDes_traj[i, 17, qi] * rad2deg,
+                    "pos_err/x": pos_err_i[0], "pos_err/y": pos_err_i[1], "pos_err/z": pos_err_i[2],
+                    "dist_from_target": dist_i,
+                }
+                writer.writerow(row)
 
 
 def plotComparisonWithUlg(time, euler_all, omega_all, ulgData=None):

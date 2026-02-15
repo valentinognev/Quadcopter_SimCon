@@ -7,10 +7,12 @@ Please feel free to use and modify this, but keep the above information. Thanks!
 """
 
 import numpy as np
+import matplotlib
 import matplotlib.pyplot as plt
 import time
 import cProfile
 import os
+import sys
 
 from trajectory import Trajectory, PositionTrajectoryType, YawTrajectoryType, WaypointTimeMode
 from ctrl import Control, ControlType
@@ -22,7 +24,7 @@ from load_ulg import load_ulg
 from pyulog.core import ULog
 
 # Optional: path to drone + control JSON config. If None or file missing, use defaults from initQuad/ctrl.
-DRONE_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "cat_drone_config.json")
+DRONE_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "iris_drone_config.json")
 
 # Optional: path to system_manager mission/config JSON (e.g. missionType, waypointList, controller params).
 # If set and file exists, mission is loaded from this file; otherwise minimal defaults are used.
@@ -32,7 +34,7 @@ SYSTEM_MANAGER_MISSION_CONFIG = os.path.join(_SIM_DIR, "..", "..", "system_manag
 
 # Set True to use system_manager as high-level controller (velocity + yaw_rate from sys_manager_step).
 # Requires system_manager at CatSwarm/system_manager/system_managerPY. Only first quad (index 0) is controlled.
-USE_SYSTEM_MANAGER = True  # Set True to use system_manager as high-level controller (1 quad, in-process).
+USE_SYSTEM_MANAGER = False  # Set True to use system_manager as high-level controller (1 quad, in-process).
 
 
 def quad_sim(t, Ts, quads, ctrl, wind, traj):
@@ -87,6 +89,55 @@ def getStartOffboardInds(timestamp, data):
     offboard_inds = np.where(data == 1)[0]
     return offboard_inds[0]
 
+
+def test_all_trajectory_types():
+    """Run simulation with each PositionTrajectoryType (trajSelect[0] = 0..13). No display."""
+    matplotlib.use("Agg")
+    # Load drone and control parameters
+    drone_params = None
+    control_params = None
+    if os.path.isfile(DRONE_CONFIG_PATH):
+        try:
+            from load_drone_config import load_drone_config
+            drone_params, control_params = load_drone_config(DRONE_CONFIG_PATH)
+        except Exception:
+            pass
+    Ti = 0
+    Ts = 0.003
+    Tf = 5.0  # Short run to verify each trajectory type
+    ctrlType = ControlType.XYZ_POS
+    wind = Wind("None", 2.0, 90, -15)
+    name_by_val = {e.value: e.name for e in PositionTrajectoryType}
+    passed = 0
+    failed = []
+    for xyz_val in range(len(PositionTrajectoryType)):
+        name = name_by_val.get(xyz_val, "?")
+        trajSelect = np.array([xyz_val, YawTrajectoryType.FOLLOW.value, WaypointTimeMode.AVERAGE_SPEED.value])
+        try:
+            quads = QuadcopterSwarm(numOfQuads=1, Ti=Ti, params=drone_params)
+            quads.setInitialQuadPos(np.array([0.0, 0.0, 0.0]), 0)
+            traj = Trajectory(quads, ctrlType, trajSelect)
+            ctrl = Control(quads, traj.yawType, control_params=control_params)
+            traj.desiredState(0, Ts, quads)
+            ctrl.controller(traj, quads, Ts)
+            numTimeStep = int(Tf / Ts + 1)
+            t = Ti
+            for _ in range(numTimeStep - 1):
+                if round(t, 3) >= Tf:
+                    break
+                t = quad_sim(t, Ts, quads, ctrl, wind, traj)
+            print("  trajSelect[0] = {} ({}) OK".format(xyz_val, name))
+            passed += 1
+        except Exception as e:
+            print("  trajSelect[0] = {} ({}) FAIL: {}".format(xyz_val, name, e))
+            failed.append((xyz_val, name, str(e)))
+    print("Result: {}/{} passed.".format(passed, len(PositionTrajectoryType)))
+    if failed:
+        for xyz_val, name, err in failed:
+            print("  - {} ({}) : {}".format(xyz_val, name, err))
+    return len(failed) == 0
+
+
 def main():
     # Load drone and control parameters from JSON if present
     drone_params = None
@@ -102,7 +153,7 @@ def main():
     # When using system_manager, only first quad (index 0) is controlled; use 1 quad.
     numOfQuads = 1 if USE_SYSTEM_MANAGER else 1
     Ti = 0
-    Ts = 0.002
+    Ts = 0.003
     Tf = 27
     quads = QuadcopterSwarm(numOfQuads=numOfQuads, Ti=Ti, params=drone_params)
     quads.setInitialQuadPos(np.array([0, 0, 0]), 0)
@@ -122,22 +173,23 @@ def main():
     # ---------------------------
     trajSelect = np.zeros(3)
 
+    # Position Trajectory Type options:
+    #   PositionTrajectoryType.HOVER (0), POS_WAYPOINT_TIMED (1), POS_WAYPOINT_INTERP (2),
+    #   MINIMUM_VELOCITY (3), MINIMUM_ACCEL (4), MINIMUM_JERK (5), MINIMUM_SNAP (6),
+    #   MINIMUM_ACCEL_STOP (7), MINIMUM_JERK_STOP (8), MINIMUM_SNAP_STOP (9),
+    #   MINIMUM_JERK_FULL_STOP (10), MINIMUM_SNAP_FULL_STOP (11),
+    #   POS_WAYPOINT_ARRIVED (12), POS_WAYPOINT_ARRIVED_WAIT (13)
+    trajSelect[0] = PositionTrajectoryType.POS_WAYPOINT_INTERP.value
+    # Yaw Trajectory Type options:
+    #   YawTrajectoryType.NONE (0), YAW_WAYPOINT_TIMED (1), YAW_WAYPOINT_INTERP (2),
+    #   FOLLOW (3), ZERO (4)
+    trajSelect[1] = YawTrajectoryType.NONE.value
+    # Waypoint Time Mode options:
+    #   WaypointTimeMode.WAYPOINT_TIME (0), AVERAGE_SPEED (1)
+    trajSelect[2] = WaypointTimeMode.AVERAGE_SPEED.value
+ 
     if USE_SYSTEM_MANAGER:
         ctrlType = ControlType.SYSTEM_MANAGER
-        # Position Trajectory Type options:
-        #   PositionTrajectoryType.HOVER (0), POS_WAYPOINT_TIMED (1), POS_WAYPOINT_INTERP (2),
-        #   MINIMUM_VELOCITY (3), MINIMUM_ACCEL (4), MINIMUM_JERK (5), MINIMUM_SNAP (6),
-        #   MINIMUM_ACCEL_STOP (7), MINIMUM_JERK_STOP (8), MINIMUM_SNAP_STOP (9),
-        #   MINIMUM_JERK_FULL_STOP (10), MINIMUM_SNAP_FULL_STOP (11),
-        #   POS_WAYPOINT_ARRIVED (12), POS_WAYPOINT_ARRIVED_WAIT (13)
-        trajSelect[0] = PositionTrajectoryType.HOVER.value  # Hover mode for system_manager desired input
-        # Yaw Trajectory Type options:
-        #   YawTrajectoryType.NONE (0), YAW_WAYPOINT_TIMED (1), YAW_WAYPOINT_INTERP (2),
-        #   FOLLOW (3), ZERO (4)
-        trajSelect[1] = YawTrajectoryType.FOLLOW.value
-        # Waypoint Time Mode options:
-        #   WaypointTimeMode.WAYPOINT_TIME (0), AVERAGE_SPEED (1)
-        trajSelect[2] = WaypointTimeMode.AVERAGE_SPEED.value           
         log_dir = os.path.join(os.path.dirname(__file__), "logs")
         os.makedirs(log_dir, exist_ok=True)
         from system_manager_adapter import flight_data_from_swarm
@@ -164,20 +216,6 @@ def main():
         # Select Control Type
         # ControlType: XYZ_POS, XY_VEL_Z_POS, XYZ_VEL, ATT, ATT_RATE
         ctrlType = ControlType.XYZ_POS
-        # Position Trajectory Type options:
-        #   PositionTrajectoryType.HOVER (0), POS_WAYPOINT_TIMED (1), POS_WAYPOINT_INTERP (2),
-        #   MINIMUM_VELOCITY (3), MINIMUM_ACCEL (4), MINIMUM_JERK (5), MINIMUM_SNAP (6),
-        #   MINIMUM_ACCEL_STOP (7), MINIMUM_JERK_STOP (8), MINIMUM_SNAP_STOP (9),
-        #   MINIMUM_JERK_FULL_STOP (10), MINIMUM_SNAP_FULL_STOP (11),
-        #   POS_WAYPOINT_ARRIVED (12), POS_WAYPOINT_ARRIVED_WAIT (13)
-        trajSelect[0] = PositionTrajectoryType.POS_WAYPOINT_TIMED.value
-        # Yaw Trajectory Type options:
-        #   YawTrajectoryType.NONE (0), YAW_WAYPOINT_TIMED (1), YAW_WAYPOINT_INTERP (2),
-        #   FOLLOW (3), ZERO (4)
-        trajSelect[1] = YawTrajectoryType.FOLLOW.value
-        # Waypoint Time Mode options:
-        #   WaypointTimeMode.WAYPOINT_TIME (0), AVERAGE_SPEED (1)
-        trajSelect[2] = WaypointTimeMode.AVERAGE_SPEED.value
         sys_manager = None
         flight_data_from_swarm = None
 
@@ -287,6 +325,10 @@ def main():
     pass
 
 if __name__ == "__main__":
+    if len(sys.argv) > 1 and sys.argv[1] == "--test-all-traj":
+        print("Testing all PositionTrajectoryType options (trajSelect[0] = 0..13)...")
+        ok = test_all_trajectory_types()
+        sys.exit(0 if ok else 1)
     if (config.orient == "NED" or config.orient == "ENU"):
         main()
         # cProfile.run('main()')

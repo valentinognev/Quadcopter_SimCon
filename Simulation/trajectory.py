@@ -115,21 +115,26 @@ class Trajectory:
             _min_vel_acc_jerk_snap = (PositionTrajectoryType.MINIMUM_VELOCITY, PositionTrajectoryType.MINIMUM_ACCEL, PositionTrajectoryType.MINIMUM_JERK,  PositionTrajectoryType.MINIMUM_SNAP)
             _min_stop = (PositionTrajectoryType.MINIMUM_ACCEL_STOP, PositionTrajectoryType.MINIMUM_JERK_STOP, PositionTrajectoryType.MINIMUM_SNAP_STOP)
             _min_full_stop = (PositionTrajectoryType.MINIMUM_JERK_FULL_STOP, PositionTrajectoryType.MINIMUM_SNAP_FULL_STOP)
+            # wps layout: rows 0,3,6,... = x of wp0,wp1,...; rows 1,4,7,... = y; rows 2,5,8,... = z
+            wps_x = self.wps[0::3, 0].flatten()
+            wps_y = self.wps[1::3, 0].flatten()
+            wps_z = self.wps[2::3, 0].flatten()
+            T_seg = self.T_segment[:, 0].flatten() if self.T_segment.ndim > 1 else self.T_segment.flatten()
             if self.xyzType in _min_vel_acc_jerk_snap:
                 self.deriv_order = self.xyzType.value - PositionTrajectoryType.MINIMUM_VELOCITY.value + 1  # 1=vel, 2=acc, 3=jerk, 4=snap
-                self.coeff_x = minSomethingTraj(self.wps[:,0], self.T_segment, self.deriv_order)
-                self.coeff_y = minSomethingTraj(self.wps[:,1], self.T_segment, self.deriv_order)
-                self.coeff_z = minSomethingTraj(self.wps[:,2], self.T_segment, self.deriv_order)
+                self.coeff_x = minSomethingTraj(wps_x, T_seg, self.deriv_order)
+                self.coeff_y = minSomethingTraj(wps_y, T_seg, self.deriv_order)
+                self.coeff_z = minSomethingTraj(wps_z, T_seg, self.deriv_order)
             elif self.xyzType in _min_stop:
                 self.deriv_order = self.xyzType.value - PositionTrajectoryType.MINIMUM_ACCEL_STOP.value + 2  # 2=acc, 3=jerk, 4=snap
-                self.coeff_x = minSomethingTraj_stop(self.wps[:,0], self.T_segment, self.deriv_order)
-                self.coeff_y = minSomethingTraj_stop(self.wps[:,1], self.T_segment, self.deriv_order)
-                self.coeff_z = minSomethingTraj_stop(self.wps[:,2], self.T_segment, self.deriv_order)
+                self.coeff_x = minSomethingTraj_stop(wps_x, T_seg, self.deriv_order)
+                self.coeff_y = minSomethingTraj_stop(wps_y, T_seg, self.deriv_order)
+                self.coeff_z = minSomethingTraj_stop(wps_z, T_seg, self.deriv_order)
             elif self.xyzType in _min_full_stop:
                 self.deriv_order = self.xyzType.value - PositionTrajectoryType.MINIMUM_JERK_FULL_STOP.value + 3  # 3=jerk, 4=snap
-                self.coeff_x = minSomethingTraj_faststop(self.wps[:,0], self.T_segment, self.deriv_order)
-                self.coeff_y = minSomethingTraj_faststop(self.wps[:,1], self.T_segment, self.deriv_order)
-                self.coeff_z = minSomethingTraj_faststop(self.wps[:,2], self.T_segment, self.deriv_order)
+                self.coeff_x = minSomethingTraj_faststop(wps_x, T_seg, self.deriv_order)
+                self.coeff_y = minSomethingTraj_faststop(wps_y, T_seg, self.deriv_order)
+                self.coeff_z = minSomethingTraj_faststop(wps_z, T_seg, self.deriv_order)
         
         if (self.yawType == YawTrajectoryType.ZERO):
             self.y_wps = np.zeros(len(self.t_wps))
@@ -172,7 +177,8 @@ class Trajectory:
         else:
             self.t_idx = np.where(t <= self.t_wps[:, 0])[0][0] - 1
             scale = (t - self.t_wps[self.t_idx, 0])/self.T_segment[self.t_idx, 0]
-            self.desPos = (1 - scale) * self.wps[self.t_idx,:] + scale * self.wps[self.t_idx + 1,:]
+            # wps layout: rows 0..2=wp0 xyz, 3..5=wp1 xyz, ...
+            self.desPos = (1 - scale) * self.wps[self.t_idx*3:self.t_idx*3+3, :] + scale * self.wps[(self.t_idx+1)*3:(self.t_idx+2)*3, :]
 
     def _pos_waypoint_min(self, t):
         """Minimum velocity/accel/jerk/snap trajectory through waypoints."""
@@ -180,8 +186,10 @@ class Trajectory:
             raise Exception("Time array and waypoint array not the same size.")
         nb_coeff = self.deriv_order*2
         if t == 0:
+            self.t_idx = 0
             self.desPos = self.wps[0:3,:]
         elif (t >= self.t_wps[-1].max()):
+            self.t_idx = self.wps.shape[0] // 3 - 1
             self.desPos = self.wps[-3:,:]
         else:
             self.t_idx = np.where(t <= self.t_wps[:, 0])[0][0] - 1
@@ -189,45 +197,73 @@ class Trajectory:
             start = nb_coeff * self.t_idx
             end = nb_coeff * (self.t_idx + 1)
             t0 = get_poly_cc(nb_coeff, 0, scale)
-            self.desPos = np.array([self.coeff_x[start:end].dot(t0), self.coeff_y[start:end].dot(t0), self.coeff_z[start:end].dot(t0)])
+            pos_1d = np.array([self.coeff_x[start:end].dot(t0), self.coeff_y[start:end].dot(t0), self.coeff_z[start:end].dot(t0)])
+            self.desPos[:, 0] = pos_1d
+            if self.numOfQuads > 1:
+                for i in range(1, self.numOfQuads):
+                    self.desPos[:, i] = pos_1d
             t1 = get_poly_cc(nb_coeff, 1, scale)
-            self.desVel = np.array([self.coeff_x[start:end].dot(t1), self.coeff_y[start:end].dot(t1), self.coeff_z[start:end].dot(t1)])
+            vel_1d = np.array([self.coeff_x[start:end].dot(t1), self.coeff_y[start:end].dot(t1), self.coeff_z[start:end].dot(t1)])
+            self.desVel[:, 0] = vel_1d
+            if self.numOfQuads > 1:
+                for i in range(1, self.numOfQuads):
+                    self.desVel[:, i] = vel_1d
             t2 = get_poly_cc(nb_coeff, 2, scale)
-            self.desAcc = np.array([self.coeff_x[start:end].dot(t2), self.coeff_y[start:end].dot(t2), self.coeff_z[start:end].dot(t2)])
+            acc_1d = np.array([self.coeff_x[start:end].dot(t2), self.coeff_y[start:end].dot(t2), self.coeff_z[start:end].dot(t2)])
+            self.desAcc[:, 0] = acc_1d
+            if self.numOfQuads > 1:
+                for i in range(1, self.numOfQuads):
+                    self.desAcc[:, i] = acc_1d
 
     def _pos_waypoint_arrived(self, t, quads):
         dist_consider_arrived = 0.2
+        n_wp = self.wps.shape[0] // 3
+        pos0 = np.atleast_2d(quads.pos)[0, :]
         if (t == 0):
             self.t_idx = 0
             self.end_reached = 0
         elif not(self.end_reached):
-            distance_to_next_wp = ((self.wps[self.t_idx,0]-quads.pos[0,0])**2 + (self.wps[self.t_idx,1]-quads.pos[0,1])**2 + (self.wps[self.t_idx,2]-quads.pos[0,2])**2)**(0.5)
+            # wps layout: rows t_idx*3, t_idx*3+1, t_idx*3+2 = x,y,z of waypoint t_idx
+            wp = self.wps[self.t_idx*3:self.t_idx*3+3, 0]
+            distance_to_next_wp = np.sqrt((wp[0]-pos0[0])**2 + (wp[1]-pos0[1])**2 + (wp[2]-pos0[2])**2)
             if (distance_to_next_wp < dist_consider_arrived):
                 self.t_idx += 1
-                if (self.t_idx >= len(self.wps[:,0])):
+                if (self.t_idx >= n_wp):
                     self.end_reached = 1
                     self.t_idx = -1
-        self.desPos = self.wps[self.t_idx,:]
+        # waypoint position: rows t_idx*3..t_idx*3+2, or last 3 rows when t_idx == -1
+        wp_pos = self.wps[-3:, :] if self.t_idx == -1 else self.wps[self.t_idx*3:self.t_idx*3+3, :]
+        self.desPos[:, 0] = wp_pos[:, 0]
+        if self.numOfQuads > 1:
+            for i in range(1, self.numOfQuads):
+                self.desPos[:, i] = wp_pos[:, i] if wp_pos.shape[1] > i else wp_pos[:, 0]
 
     def _pos_waypoint_arrived_wait(self, t, quads):
         dist_consider_arrived = 0.2
+        n_wp = self.wps.shape[0] // 3
+        pos0 = np.atleast_2d(quads.pos)[0, :]
         if (t == 0):
             self.t_idx = 0
             self.t_arrived = 0
             self.arrived = True
             self.end_reached = 0
         elif not(self.end_reached):
-            distance_to_next_wp = ((self.wps[self.t_idx,0]-quads.pos[0,0])**2 + (self.wps[self.t_idx,1]-quads.pos[0,1])**2 + (self.wps[self.t_idx,2]-quads.pos[0,2])**2)**(0.5)
+            wp = self.wps[self.t_idx*3:self.t_idx*3+3, 0]
+            distance_to_next_wp = np.sqrt((wp[0]-pos0[0])**2 + (wp[1]-pos0[1])**2 + (wp[2]-pos0[2])**2)
             if (distance_to_next_wp < dist_consider_arrived) and not self.arrived:
                 self.t_arrived = t
                 self.arrived = True
             elif self.arrived and (t-self.t_arrived > self.t_wps[self.t_idx, 0]):
                 self.t_idx += 1
                 self.arrived = False
-                if (self.t_idx >= len(self.wps[:,0])):
+                if (self.t_idx >= n_wp):
                     self.end_reached = 0
                     self.t_idx = 0
-        self.desPos = self.wps[self.t_idx,:]
+        wp_pos = self.wps[-3:, :] if self.t_idx == -1 else self.wps[self.t_idx*3:self.t_idx*3+3, :]
+        self.desPos[:, 0] = wp_pos[:, 0]
+        if self.numOfQuads > 1:
+            for i in range(1, self.numOfQuads):
+                self.desPos[:, i] = wp_pos[:, i] if wp_pos.shape[1] > i else wp_pos[:, 0]
 
     def _yaw_waypoint_timed(self, t):
         if not (len(self.t_wps) == len(self.y_wps)):
@@ -247,20 +283,24 @@ class Trajectory:
             self.current_heading = self.desEul[2]
 
     def _yaw_follow(self, t, Ts, quads):
+        pos0 = np.atleast_2d(quads.pos)[0, :]
+        # First quad desired position as (3,) x,y,z; desPos can be (3,n), (3,), or (1,3)
+        d = np.asarray(self.desPos).flatten()
+        des_pos0 = d[:3] if len(d) >= 3 else np.pad(d, (0, 3 - len(d)), constant_values=0)
         if (self.xyzType == PositionTrajectoryType.POS_WAYPOINT_TIMED or
             self.xyzType == PositionTrajectoryType.POS_WAYPOINT_INTERP or
             self.xyzType == PositionTrajectoryType.POS_WAYPOINT_ARRIVED):
             if (t == 0):
                 self.desEul[2] = 0
             else:
-                self.desEul[2] = np.arctan2(self.desPos[1,0]-quads.pos[0,1], self.desPos[0,0]-quads.pos[0,0])
+                self.desEul[2] = np.arctan2(des_pos0[1]-pos0[1], des_pos0[0]-pos0[0])
         elif (self.xyzType == PositionTrajectoryType.POS_WAYPOINT_ARRIVED_WAIT):
             if (t == 0):
                 self.desEul[2] = 0
                 self.prevDesYaw = self.desEul[2]
             else:
                 if not (self.arrived):
-                    self.desEul[2] = np.arctan2(self.desPos[1,0]-quads.pos[0,1], self.desPos[0,0]-quads.pos[0,0])
+                    self.desEul[2] = np.arctan2(des_pos0[1]-pos0[1], des_pos0[0]-pos0[0])
                     self.prevDesYaw = self.desEul[2]
                 else:
                     self.desEul[2] = self.prevDesYaw

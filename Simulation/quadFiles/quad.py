@@ -129,10 +129,11 @@ class QuadcopterSwarm:
             self.dcm[i,:,:] = utils.quat2Dcm(self.quat[i,:])
 
         # Euler angles of current state
+        # quatToYPR_ZYX returns [yaw, pitch, roll] = [psi, theta, phi]; we want euler = [roll, pitch, yaw] = [phi, theta, psi]
         YPR = np.zeros((self.numOfQuads, 3))
         for i in range(self.numOfQuads):
             YPR[i,:] = utils.quatToYPR_ZYX(self.quat[i,:])
-        self.euler = YPR[::-1] # flip YPR so that euler state = phi, theta, psi
+        self.euler = YPR[:, ::-1]  # flip columns: [psi,theta,phi] -> [phi,theta,psi]
         self.psi[:] = YPR[:,0]
         self.theta[:] = YPR[:,1]
         self.phi[:] = YPR[:,2]
