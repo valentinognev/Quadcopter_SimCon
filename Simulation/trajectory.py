@@ -391,7 +391,8 @@ class Trajectory:
         elif (self.ctrlType == ControlType.XYZ_POS):
             # Hover at [0, 0, 0]
             if (self.xyzType == PositionTrajectoryType.HOVER):
-                pass 
+                self.desPos = desired['pos']
+                self.sDes = np.concatenate((self.desPos, self.desVel, self.desAcc, self.desThr, self.desEul, self.desPQR, self.desYawRate), axis=0).astype(float)
             # For simple testing
             elif (self.xyzType.value == 99):
                 self.sDes = testXYZposition(t)   
