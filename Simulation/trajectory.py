@@ -349,20 +349,11 @@ class Trajectory:
             if (self.xyzType == PositionTrajectoryType.POS_WAYPOINT_TIMED):
                 self.sDes = testVelControl(t, ControlType.XY_VEL_Z_POS, self.ulgData)
             elif (self.xyzType == PositionTrajectoryType.HOVER and desired is not None):
-                # Trajectory for Desired States (e.g. from system_manager)
-                # sDes must be (19, numOfQuads) for ctrl.controller indexing
-                desPos = np.array([desired['pos'][0], desired['pos'][1], desired['pos'][2]])
-                v = desired['vel']
-                desVel = np.array([v[0], v[1], v[2] if len(v) > 2 else 0.0])
-                desAcc = np.zeros(3)
-                desThr = np.zeros(3)
-                desEul = np.zeros(3)
-                desPQR = np.zeros(3)
-                desYawRate = desired['yaw_rate']
-                vec = np.hstack((desPos, desVel, desAcc, desThr, desEul, desPQR, np.atleast_1d(desYawRate))).astype(float)
-                # Broadcast to (19, numOfQuads)
-                self.sDes = np.tile(vec.reshape(-1, 1), (1, self.numOfQuads))
-                pass
+                # Per-drone desired pos (3, N) and vel (3, N).
+                # pos[:,i] z-component used for altitude hold; vel[:,i] xy used for velocity control.
+                self.desPos = np.asarray(desired['pos'])  # (3, numOfQuads)
+                self.desVel = np.asarray(desired['vel'])  # (3, numOfQuads)
+                self.sDes = np.concatenate((self.desPos, self.desVel, self.desAcc, self.desThr, self.desEul, self.desPQR, self.desYawRate), axis=0).astype(float)
 
         elif (self.ctrlType == ControlType.SYSTEM_MANAGER):
             # Desired state from system_manager (vel + yaw_rate; pos used for altitude hold only).
