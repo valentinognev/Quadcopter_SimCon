@@ -47,20 +47,55 @@ class ControlType(Enum):
 # Default PID Gains and Max Values (used when no control_params provided)
 # ---------------------------
 def _default_control_params():
-    Px, Py, Pz = 1.0*.7, 1.0*.7*.8, 3.0
+    # Position P gains
+    Py    = 0.7
+    Px    = Py
+    Pz    = 1.0
     pos_P_gain = np.array([Px, Py, Pz])
-    Pxdot, Dxdot, Ixdot = 1.9, 0.05, 0.2
-    Pydot, Dydot, Iydot = Pxdot, Dxdot, Ixdot
-    Pzdot, Dzdot, Izdot = 8.0, 0.5, 1.5
+    # Velocity P-D gains
+    Pxdot = 3
+    Dxdot = .25
+    Ixdot = 0.2
+    FFxdot = 0.0
+    FFdxdot = 0.0
+
+    yfactor = 1
+    Pydot = Pxdot*yfactor
+    Dydot = Dxdot*yfactor
+    Iydot = Ixdot*yfactor
+    FFydot = FFxdot*yfactor
+    FFdydot = FFdxdot*yfactor
+
+    Pzdot = 4.0*6*6
+    Dzdot = 0.5
+    Izdot = 5.0
+    FFzdot = 0.0
+    FFdzdot = 0.0
     vel_P_gain = np.array([Pxdot, Pydot, Pzdot])
     vel_D_gain = np.array([Dxdot, Dydot, Dzdot])
     vel_I_gain = np.array([Ixdot, Iydot, Izdot])
     vel_FF_gain = np.array([0.0, 0.0, 0.0])
     vel_FF_dot_gain = np.array([0.05, 0.05, 0.3])
-    att_P_gain = np.array([8.0, 8.0, 1.5])
+    # Attitude P gains
+    Pphi = 10*2
+    Ptheta = Pphi
+    Ppsi = 1.5
+    PpsiStrong = 8
+
+    att_P_gain = np.array([Pphi, Ptheta, Ppsi])
+    # Rate P-D gains
     rateFactor = 0.5
-    rate_P_gain = np.array([0.4*rateFactor, 0.4*rateFactor, 3.0])
-    rate_D_gain = np.array([0.005*2*rateFactor, 0.005*2*rateFactor, 0.019])
+    Pp = 0.4*rateFactor
+    Dp = 0.005*2*rateFactor
+
+    Pq = Pp
+    Dq = Dp 
+
+    Pr = 3
+    Dr = 0.019
+
+    rate_P_gain = np.array([Pp, Pq, Pr])
+    rate_D_gain = np.array([Dp, Dq, Dr])
     return {
         "pos_P_gain": pos_P_gain,
         "vel_P_gain": vel_P_gain,
@@ -214,7 +249,9 @@ class Control:
 
             # Transform thrust setpoint from body frame to inertial frame using current attitude
             thrust_sp_body = self.thrust_sp.copy()
-            self.thrust_sp[:] = utils.quat2Dcm(quads.quat) @ thrust_sp_body
+            for i in range(quads.numOfQuads):
+                dcm = utils.quat2Dcm(quads.quat[i, :])
+                self.thrust_sp[:, i] = dcm @ thrust_sp_body[:, i]
             
             # Set rate setpoint directly from trajectory (interpolated from ulg file)
             self.rate_sp[:] = self.pqr_sp[:]
@@ -234,17 +271,21 @@ class Control:
             self.attitude_control(quads, Ts)
             self.rate_control(quads, Ts)
 
-        # Mixer
-        # --------------------------- 
-        self.w_cmd = utils.mixerFM(quads, norm(self.thrust_sp, axis=0), self.rateCtrl)
+        # Mixer (use only first numOfQuads columns to match swarm size)
+        # ---------------------------
+        nq = quads.numOfQuads
+        thr_nq = norm(self.thrust_sp[:, :nq], axis=0)
+        rate_nq = self.rateCtrl[:, :nq]
+        self.w_cmd[:, :nq] = utils.mixerFM(quads, thr_nq, rate_nq)
         
-        # Add calculated Desired States
-        # ---------------------------         
-        self.sDesCalc[0:3,:] = self.pos_sp
-        self.sDesCalc[3:6,:] = self.vel_sp
-        self.sDesCalc[6:9,:] = self.thrust_sp
-        self.sDesCalc[9:13,:] = self.qd
-        self.sDesCalc[13:16,:] = self.rate_sp
+        # Add calculated Desired States (slice to match numOfQuads in case of shape mismatch)
+        # ---------------------------
+        nq = quads.numOfQuads
+        self.sDesCalc[0:3,:] = self.pos_sp[:, :nq]
+        self.sDesCalc[3:6,:] = self.vel_sp[:, :nq]
+        self.sDesCalc[6:9,:] = self.thrust_sp[:, :nq]
+        self.sDesCalc[9:13,:] = self.qd[:, :nq]
+        self.sDesCalc[13:16,:] = self.rate_sp[:, :nq]
         
         self.prevVel_sp = deepcopy(self.vel_sp)
 

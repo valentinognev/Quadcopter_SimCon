@@ -26,8 +26,22 @@ import config
 from load_ulg import load_ulg
 from pyulog.core import ULog
 
+
+USE_CAT_DRONE_CONFIG = True
+
 # Optional: path to drone + control JSON config. If None or file missing, use defaults from initQuad/ctrl.
-DRONE_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "iris_drone_config.json")
+if USE_CAT_DRONE_CONFIG:
+    DRONE_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "cat_drone_config.json")
+    DEFAULT_REAL_FLIGHT_ULG = "/home/valentin/RL/TESTFLIGHTS/log_3_2025-12-7-16-23-46.ulg"
+    # ULG reproduction: match reference project (RL/t) for reproducing flight logs
+    ULG_REPRODUCTION_START_TIME = 200.0  # Crop log from this time (s); timestamps shifted to 0
+    ULG_REPRODUCTION_TF = 50.0  # Fixed simulation end time (s)
+else:
+    DRONE_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "iris_drone_config.json")
+    DEFAULT_REAL_FLIGHT_ULG = "/home/valentin/RL/TESTFLIGHTS/gazebo/log_0_2025-12-22-21-27-14.ulg"
+    # ULG reproduction: match reference project (RL/t) for reproducing flight logs
+    ULG_REPRODUCTION_START_TIME = 50.0  # Crop log from this time (s); timestamps shifted to 0
+    ULG_REPRODUCTION_TF = 50.0  # Fixed simulation end time (s)
 
 # Optional: path to system_manager mission/config JSON (e.g. missionType, waypointList, controller params).
 # If set and file exists, mission is loaded from this file; otherwise minimal defaults are used.
@@ -38,6 +52,31 @@ SYSTEM_MANAGER_MISSION_CONFIG = os.path.join(_SIM_DIR, "..", "..", "system_manag
 # Set True to use system_manager as high-level controller (velocity + yaw_rate from sys_manager_step).
 # Requires system_manager at CatSwarm/system_manager/system_managerPY. Only first quad (index 0) is controlled.
 USE_SYSTEM_MANAGER = False  # Set True to use system_manager as high-level controller (1 quad, in-process).
+
+REAL_FLIGHT_FIELDS = [
+    ["vehicle_local_position", "vx"],
+    ["vehicle_local_position", "vy"],
+    ["vehicle_local_position", "vz"],
+    ["vehicle_local_position_setpoint", "vx"],
+    ["vehicle_local_position_setpoint", "vy"],
+    ["vehicle_local_position_setpoint", "vz"],
+    ["vehicle_attitude", "roll"],
+    ["vehicle_attitude", "pitch"],
+    ["vehicle_attitude", "yaw"],
+    ["vehicle_attitude_setpoint", "roll_body"],
+    ["vehicle_attitude_setpoint", "pitch_body"],
+    ["vehicle_attitude_setpoint", "yaw_body"],
+    ["vehicle_rates_setpoint", "pitch"],
+    ["vehicle_rates_setpoint", "roll"],
+    ["vehicle_rates_setpoint", "yaw"],
+    ["vehicle_angular_velocity", "xyz[0]"],
+    ["vehicle_angular_velocity", "xyz[1]"],
+    ["vehicle_angular_velocity", "xyz[2]"],
+    ["vehicle_thrust_setpoint", "xyz[0]"],
+    ["vehicle_thrust_setpoint", "xyz[1]"],
+    ["vehicle_thrust_setpoint", "xyz[2]"],
+    ["vehicle_control_mode", "flag_control_offboard_enabled"],
+]
 
 
 def quad_sim(t, Ts, quads, ctrl, wind, traj):
@@ -91,6 +130,156 @@ def quad_sim_system_manager(t, Ts, quads, ctrl, wind, traj, sys_manager, flight_
 def getStartOffboardInds(timestamp, data):
     offboard_inds = np.where(data == 1)[0]
     return offboard_inds[0]
+
+
+def _load_real_flight_ulg(ulg_path, start_time_s=None):
+    """Load ULog for real-flight comparison. start_time_s crops data (None = use full log)."""
+    ulg_data = load_ulg(
+        ulg_path,
+        fields_to_extract=REAL_FLIGHT_FIELDS,
+        startTime=start_time_s,
+        verbose=True,
+    )
+    offstart_time = 50.0
+    if "vehicle_control_mode_flag_control_offboard_enabled" in ulg_data:
+        data = ulg_data["vehicle_control_mode_flag_control_offboard_enabled"]["data"]
+        offboard_inds = np.where(data == 1)[0]
+        if len(offboard_inds) > 0:
+            offstart_time = ulg_data["vehicle_control_mode_flag_control_offboard_enabled"]["timestamp"][offboard_inds[0]]
+    tf = 105.0
+    for key, val in ulg_data.items():
+        if "timestamp" in val and len(val["timestamp"]) > 0:
+            tf = max(tf, float(val["timestamp"][-1]))
+    return ulg_data, offstart_time, tf
+
+
+def _real_flight_control_type(ulg_data):
+    if (
+        "vehicle_rates_setpoint_roll" in ulg_data
+        and "vehicle_rates_setpoint_pitch" in ulg_data
+        and "vehicle_rates_setpoint_yaw" in ulg_data
+    ):
+        return ControlType.ATT_RATE
+    if (
+        "vehicle_attitude_setpoint_roll_body" in ulg_data
+        and "vehicle_attitude_setpoint_pitch_body" in ulg_data
+        and "vehicle_attitude_setpoint_yaw_body" in ulg_data
+    ):
+        return ControlType.ATT
+    if "vehicle_local_position_setpoint_vz" in ulg_data:
+        return ControlType.XYZ_VEL
+    return ControlType.XY_VEL_Z_POS
+
+
+def _real_flight_traj_select(ctrl_type):
+    traj_select = np.zeros(3)
+    traj_select[0] = PositionTrajectoryType.POS_WAYPOINT_TIMED.value
+    traj_select[1] = YawTrajectoryType.FOLLOW.value
+    traj_select[2] = WaypointTimeMode.AVERAGE_SPEED.value
+    if ctrl_type == ControlType.ATT:
+        traj_select[0] = PositionTrajectoryType.POS_WAYPOINT_TIMED.value
+    elif ctrl_type == ControlType.ATT_RATE:
+        traj_select[0] = PositionTrajectoryType.POS_WAYPOINT_TIMED.value
+    elif ctrl_type == ControlType.XYZ_VEL:
+        traj_select[0] = PositionTrajectoryType.POS_WAYPOINT_TIMED.value
+    else:
+        traj_select[0] = PositionTrajectoryType.POS_WAYPOINT_TIMED.value
+    return traj_select
+
+
+def run_real_flight_comparison(ulg_path):
+    """Run ULG reproduction mode: XY_VEL_Z_POS, startTime=200, Tf=50. Uses cat_drone_config for controller gains (reference RL/t constants)."""
+    start_time = time.time()
+    ulg_data, _, _ = _load_real_flight_ulg(ulg_path, start_time_s=ULG_REPRODUCTION_START_TIME)
+
+    # Load drone + control params from cat_drone_config (contains reference RL/t controller constants)
+    drone_params = None
+    control_params = None
+    if os.path.isfile(DRONE_CONFIG_PATH):
+        try:
+            from load_drone_config import load_drone_config
+
+            drone_params, control_params = load_drone_config(DRONE_CONFIG_PATH)
+            logger.info("Loaded drone and control config from %s (reference RL/t gains)", DRONE_CONFIG_PATH)
+        except Exception as e:
+            logger.warning("Could not load drone config (%s): %s. Using defaults.", DRONE_CONFIG_PATH, e)
+
+    Ti = 0
+    Ts = 0.002
+    Tf = ULG_REPRODUCTION_TF
+    ifsave = 0
+
+    # Force XY_VEL_Z_POS to match reference (velocity setpoints vx, vy, vz from vehicle_local_position_setpoint)
+    ctrlType = ControlType.XY_VEL_Z_POS
+    trajSelect = _real_flight_traj_select(ctrlType)
+    logger.info("Real-flight comparison mode using control type: %s", ctrlType)
+
+    quads = QuadcopterSwarm(numOfQuads=1, Ti=Ti, params=drone_params)
+    traj = Trajectory(quads, ctrlType, trajSelect, ulgData=ulg_data)
+    ctrl = Control(quads, traj.yawType, control_params=control_params)
+    wind = Wind("None", 2.0, 90, -15)
+
+    traj.desiredState(Ti, Ts, quads)
+    ctrl.controller(traj, quads, Ts)
+
+    numTimeStep = int(Tf / Ts + 1)
+    t_all = np.zeros(numTimeStep)
+    s_all = np.zeros([numTimeStep, quads.state.shape[0], quads.state.shape[1]])
+    pos_all = np.zeros([numTimeStep, quads.pos.shape[0], quads.pos.shape[1]])
+    vel_all = np.zeros([numTimeStep, quads.vel.shape[0], quads.vel.shape[1]])
+    quat_all = np.zeros([numTimeStep, quads.quat.shape[0], quads.quat.shape[1]])
+    omega_all = np.zeros([numTimeStep, quads.omega.shape[0], quads.omega.shape[1]])
+    euler_all = np.zeros([numTimeStep, quads.euler.shape[0], quads.euler.shape[1]])
+    sDes_traj_all = np.zeros([numTimeStep, traj.sDes.shape[0], traj.sDes.shape[1]])
+    sDes_calc_all = np.zeros([numTimeStep, ctrl.sDesCalc.shape[0], ctrl.sDesCalc.shape[1]])
+    w_cmd_all = np.zeros([numTimeStep, ctrl.w_cmd.shape[0], ctrl.w_cmd.shape[1]])
+    # wMotor/thr/tor: makeFigures expects (N, 4, numOfQuads)
+    wMotor_all = np.zeros([numTimeStep, 4, quads.numOfQuads])
+    thr_all = np.zeros([numTimeStep, 4, quads.numOfQuads])
+    tor_all = np.zeros([numTimeStep, 4, quads.numOfQuads])
+
+    t_all[0] = Ti
+    s_all[0] = quads.state
+    pos_all[0] = quads.pos
+    vel_all[0] = quads.vel
+    quat_all[0] = quads.quat
+    omega_all[0] = quads.omega
+    euler_all[0] = quads.euler
+    sDes_traj_all[0] = traj.sDes
+    sDes_calc_all[0] = ctrl.sDesCalc
+    w_cmd_all[0] = ctrl.w_cmd
+    wMotor_all[0] = quads.wMotor if quads.wMotor.shape[0] == 4 else quads.wMotor.T
+    thr_all[0] = quads.thr if quads.thr.shape[0] == 4 else quads.thr.T
+    tor_all[0] = quads.tor if quads.tor.shape[0] == 4 else quads.tor.T
+
+    t = Ti
+    i = 1
+    while round(t, 3) < Tf:
+        t = quad_sim(t, Ts, quads, ctrl, wind, traj)
+        try:
+            t_all[i] = t
+            s_all[i] = quads.state
+            pos_all[i] = quads.pos
+            vel_all[i] = quads.vel
+            quat_all[i] = quads.quat
+            omega_all[i] = quads.omega
+            euler_all[i] = quads.euler
+            sDes_traj_all[i] = traj.sDes
+            sDes_calc_all[i] = ctrl.sDesCalc
+            w_cmd_all[i] = ctrl.w_cmd
+            wMotor_all[i] = quads.wMotor if quads.wMotor.shape[0] == 4 else quads.wMotor.T
+            thr_all[i] = quads.thr if quads.thr.shape[0] == 4 else quads.thr.T
+            tor_all[i] = quads.tor if quads.tor.shape[0] == 4 else quads.tor.T
+        except IndexError as e:
+            logger.warning("Simulation index mismatch at t=%.3f (i=%d): %s. Stopping.", t, i, e)
+            break
+        i += 1
+
+    end_time = time.time()
+    logger.info("Simulated %.2fs in %.6fs.", t, end_time - start_time)
+    utils.makeFigures(quads.params, t_all, pos_all, vel_all, quat_all, omega_all, euler_all, w_cmd_all, wMotor_all, thr_all, tor_all, sDes_traj_all, sDes_calc_all, ulgData=ulg_data)
+    utils.plotComparisonWithUlg(t_all, euler_all[:, 0, :], omega_all[:, 0, :], ulgData=ulg_data)
+    ani = utils.sameAxisAnimation(t_all, traj.wps, pos_all, quat_all, sDes_traj_all, Ts, quads.params, traj.xyzType, traj.yawType, ifsave)
 
 
 def test_all_trajectory_types():
@@ -154,7 +343,8 @@ def main():
             logger.warning("Could not load drone config (%s): %s. Using defaults.", DRONE_CONFIG_PATH, e)
 
     # When using system_manager, only first quad (index 0) is controlled; use 1 quad.
-    numOfQuads = 1 if USE_SYSTEM_MANAGER else 4
+    # When drone config is loaded from DRONE_CONFIG_PATH, use single drone.
+    numOfQuads = 1 if (USE_SYSTEM_MANAGER or drone_params is not None) else 4
     Ti = 0
     Ts = 0.003
     Tf = 27
@@ -266,9 +456,10 @@ def main():
     sDes_traj_all  = np.zeros([numTimeStep, traj.sDes.shape[0], traj.sDes.shape[1]])
     sDes_calc_all  = np.zeros([numTimeStep, ctrl.sDesCalc.shape[0], ctrl.sDesCalc.shape[1]])
     w_cmd_all      = np.zeros([numTimeStep, ctrl.w_cmd.shape[0], ctrl.w_cmd.shape[1]])
-    wMotor_all     = np.zeros([numTimeStep, quads.wMotor.shape[0], quads.wMotor.shape[1]])
-    thr_all        = np.zeros([numTimeStep, quads.thr.shape[0], quads.thr.shape[1]])
-    tor_all        = np.zeros([numTimeStep, quads.tor.shape[0], quads.tor.shape[1]])
+    # makeFigures expects (N, 4, numOfQuads) for wMotor/thr/tor
+    wMotor_all     = np.zeros([numTimeStep, 4, quads.numOfQuads])
+    thr_all        = np.zeros([numTimeStep, 4, quads.numOfQuads])
+    tor_all        = np.zeros([numTimeStep, 4, quads.numOfQuads])
 
     t_all[0]            = Ti
     s_all[0]          = quads.state
@@ -280,10 +471,9 @@ def main():
     sDes_traj_all[0]  = traj.sDes
     sDes_calc_all[0]  = ctrl.sDesCalc
     w_cmd_all[0]      = ctrl.w_cmd
-    # Store step 0 with same layout as later steps: (4, numOfQuads) for wMotor/thr/tor
-    wMotor_all[0]     = quads.wMotor
-    thr_all[0]        = quads.thr
-    tor_all[0]        = quads.tor
+    wMotor_all[0]     = quads.wMotor if quads.wMotor.shape[0] == 4 else quads.wMotor.T
+    thr_all[0]        = quads.thr if quads.thr.shape[0] == 4 else quads.thr.T
+    tor_all[0]        = quads.tor if quads.tor.shape[0] == 4 else quads.tor.T
 
     # Run Simulation
     # ---------------------------
@@ -306,9 +496,9 @@ def main():
             sDes_traj_all[i]     = traj.sDes
             sDes_calc_all[i]     = ctrl.sDesCalc
             w_cmd_all[i]         = ctrl.w_cmd
-            wMotor_all[i]        = quads.wMotor
-            thr_all[i]           = quads.thr
-            tor_all[i]           = quads.tor
+            wMotor_all[i]        = quads.wMotor.T
+            thr_all[i]           = quads.thr.T
+            tor_all[i]           = quads.tor.T
         except IndexError as e:
             logger.warning("Simulation index mismatch at t=%.3f (i=%d): %s. Stopping.", t, i, e)
             break
@@ -329,6 +519,11 @@ if __name__ == "__main__":
         logger.info("Testing all PositionTrajectoryType options (trajSelect[0] = 0..13)...")
         ok = test_all_trajectory_types()
         sys.exit(0 if ok else 1)
+    if len(sys.argv) > 1 and sys.argv[1] == "--real-flight-compare":
+        ulg_path = sys.argv[2] if len(sys.argv) > 2 else DEFAULT_REAL_FLIGHT_ULG
+        logger.info("Running real-flight comparison with %s", ulg_path)
+        run_real_flight_comparison(ulg_path)
+        sys.exit(0)
     if config.orient in ("NED", "ENU"):
         main()
     else:

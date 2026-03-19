@@ -83,8 +83,8 @@ class WaypointTimeMode(Enum):
 
 class Trajectory:
 
-    def __init__(self, quads, ctrlType: ControlType, trajSelect=np.zeros(3)):
-
+    def __init__(self, quads, ctrlType: ControlType, trajSelect=np.zeros(3), ulgData=None):
+        self.ulgData = ulgData
         self.numOfQuads = quads.numOfQuads
         self.maxThr = quads.params["maxThr"]  # Maximum total thrust [Nt] for converting percentage to physical units
         
@@ -343,11 +343,13 @@ class Trajectory:
 
         if (self.ctrlType == ControlType.XYZ_VEL):
             if (self.xyzType == PositionTrajectoryType.POS_WAYPOINT_TIMED):
-                self.sDes = testVelControl(t, ControlType.XYZ_VEL, self.ulgData)
+                vec = testVelControl(t, ControlType.XYZ_VEL, self.ulgData)
+                self.sDes = np.tile(np.atleast_2d(vec).T, (1, self.numOfQuads))
 
         elif (self.ctrlType == ControlType.XY_VEL_Z_POS):
             if (self.xyzType == PositionTrajectoryType.POS_WAYPOINT_TIMED):
-                self.sDes = testVelControl(t, ControlType.XY_VEL_Z_POS, self.ulgData)
+                vec = testVelControl(t, ControlType.XY_VEL_Z_POS, self.ulgData)
+                self.sDes = np.tile(np.atleast_2d(vec).T, (1, self.numOfQuads))
             elif (self.xyzType == PositionTrajectoryType.HOVER and desired is not None):
                 # Trajectory for Desired States (e.g. from system_manager)
                 # sDes must be (19, numOfQuads) for ctrl.controller indexing
@@ -382,11 +384,13 @@ class Trajectory:
         elif (self.ctrlType == ControlType.ATT):
             # Attitude target mode: angles + thrust, rates calculated by attitude_control
             if (self.xyzType == PositionTrajectoryType.POS_WAYPOINT_TIMED):
-                self.sDes = testAttControl(t, self.ulgData, self.maxThr)
+                vec = testAttControl(t, self.ulgData, self.maxThr)
+                self.sDes = np.tile(np.atleast_2d(vec).T, (1, self.numOfQuads))
         elif (self.ctrlType == ControlType.ATT_RATE):
             # Attitude rate target mode: rates + thrust, bypasses attitude_control
             if (self.xyzType == PositionTrajectoryType.POS_WAYPOINT_TIMED):
-                self.sDes = testAttRateControl(t, self.ulgData, self.maxThr)
+                vec = testAttRateControl(t, self.ulgData, self.maxThr)
+                self.sDes = np.tile(np.atleast_2d(vec).T, (1, self.numOfQuads))
         
         elif (self.ctrlType == ControlType.XYZ_POS):
             # Hover at [0, 0, 0]
@@ -735,7 +739,14 @@ def testVelControl(t, ctlType: ControlType, ulgdata=None):
             timestamps = vz_data['timestamp']
             values = vz_data['data']
             desVel[2] = np.interp(t, timestamps, values, left=0.0, right=0.0)
-     
+
+        # Interpolate yaw rate from vehicle_rates_setpoint_yaw (matches reference RL/t)
+        if "vehicle_rates_setpoint_yaw" in ulgdata:
+            yaw_rate_data = ulgdata["vehicle_rates_setpoint_yaw"]
+            timestamps = yaw_rate_data["timestamp"]
+            values = yaw_rate_data["data"]
+            desYawRate = np.interp(t, timestamps, values, left=0.0, right=0.0)
+
     sDes = np.hstack((desPos, desVel, desAcc, desThr, desEul, desPQR, desYawRate)).astype(float)
     
     return sDes

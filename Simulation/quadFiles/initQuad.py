@@ -15,7 +15,7 @@ try:
     from .. import utils
     from .. import config
 except ImportError:
-    import utils
+    import utils 
     import config
 
 

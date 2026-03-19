@@ -16,7 +16,15 @@ except ImportError:
 
 
 def mixerFM(quad, thr, moment):
-    t = np.array([thr, moment[0], moment[1], moment[2]])
+    thr = np.atleast_1d(np.asarray(thr)).flatten()
+    moment = np.asarray(moment)
+    if moment.ndim == 1:
+        moment = moment.reshape(3, 1)
+    n = thr.size
+    if moment.shape[1] != n:
+        n = moment.shape[1]
+        thr = np.broadcast_to(thr, n) if thr.size == 1 else thr
+    t = np.vstack([np.broadcast_to(thr, n), moment])
     w_cmd = np.sqrt(np.clip(np.dot(quad.params["mixerFMinv"], t), quad.params["minWmotor"]**2, quad.params["maxWmotor"]**2))
 
     return w_cmd
