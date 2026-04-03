@@ -352,33 +352,32 @@ class Trajectory:
                 self.sDes = np.tile(np.atleast_2d(vec).T, (1, self.numOfQuads))
             elif (self.xyzType == PositionTrajectoryType.HOVER and desired is not None):
                 # Trajectory for Desired States (e.g. from system_manager)
-                # sDes must be (19, numOfQuads) for ctrl.controller indexing
-                desPos = np.array([desired['pos'][0], desired['pos'][1], desired['pos'][2]])
-                v = desired['vel']
-                desVel = np.array([v[0], v[1], v[2] if len(v) > 2 else 0.0])
-                desAcc = np.zeros(3)
-                desThr = np.zeros(3)
-                desEul = np.zeros(3)
-                desPQR = np.zeros(3)
-                desYawRate = desired['yaw_rate']
-                vec = np.hstack((desPos, desVel, desAcc, desThr, desEul, desPQR, np.atleast_1d(desYawRate))).astype(float)
-                # Broadcast to (19, numOfQuads)
-                self.sDes = np.tile(vec.reshape(-1, 1), (1, self.numOfQuads))
-                pass
-
+                # Ensure all inputs are (N, num_agents) or (num_agents,)
+                desPos = np.atleast_2d(desired['pos'])
+                v = np.atleast_2d(desired['vel'])
+                desVel = v if v.shape[0] == 3 else np.vstack([v[0], v[1], np.zeros(v.shape[1])])
+                desAcc = np.zeros_like(desPos)
+                desThr = np.zeros_like(desPos)
+                desEul = np.zeros_like(desPos)
+                desPQR = np.zeros_like(desPos)
+                desYawRate = np.atleast_2d(desired['yaw_rate'])
+                
+                # Assemble sDes (19, numOfQuads)
+                self.sDes = np.vstack((desPos, desVel, desAcc, desThr, desEul, desPQR, desYawRate)).astype(float)
+                
         elif (self.ctrlType == ControlType.SYSTEM_MANAGER):
             # Desired state from system_manager (vel + yaw_rate; pos used for altitude hold only).
             if desired is not None:
-                desPos = np.array([desired['pos'][0], desired['pos'][1], desired['pos'][2]])
-                v = desired['vel']
-                desVel = np.array([v[0], v[1], v[2] if len(v) > 2 else 0.0])
-                desAcc = np.zeros(3)
-                desThr = np.zeros(3)
-                desEul = np.zeros(3)
-                desPQR = np.zeros(3)
-                desYawRate = desired['yaw_rate']
-                vec = np.hstack((desPos, desVel, desAcc, desThr, desEul, desPQR, np.atleast_1d(desYawRate))).astype(float)
-                self.sDes = np.tile(vec.reshape(-1, 1), (1, self.numOfQuads))
+                desPos = np.atleast_2d(desired['pos'])
+                v = np.atleast_2d(desired['vel'])
+                desVel = v if v.shape[0] == 3 else np.vstack([v[0], v[1], np.zeros(v.shape[1])])
+                desAcc = np.zeros_like(desPos)
+                desThr = np.zeros_like(desPos)
+                desEul = np.zeros_like(desPos)
+                desPQR = np.zeros_like(desPos)
+                desYawRate = np.atleast_2d(desired['yaw_rate'])
+                
+                self.sDes = np.vstack((desPos, desVel, desAcc, desThr, desEul, desPQR, desYawRate)).astype(float)
             # else: sDes remains zeros from initialization above
 
         elif (self.ctrlType == ControlType.ATT):
